@@ -10,6 +10,7 @@ import { penalizeVelocity } from './penalize';
 import { updateMillSolidMask, updateCylinderSolidMask, updateTaylorCouetteSolidMask } from './sdf';
 import { updateBedMask, solveChordOffset } from './bed';
 import { applyPorousDrag, computePermeability } from './porous';
+import { gebartPermeability, gebartSquarePermeability, RveSolver } from './rve';
 import { Solver } from './solver';
 
 export function add(a: f64, b: f64): f64 {
@@ -17,6 +18,7 @@ export function add(a: f64, b: f64): f64 {
 }
 
 const g_solver: Solver = new Solver();
+const g_rve: RveSolver = new RveSolver();
 
 // Solver instance exports
 export function createSolver(N: i32, L: Real): void {
@@ -375,3 +377,33 @@ export function opPenalize(eta: Real, dt: Real): void {
     g_N, dt, eta
   );
 }
+
+// --- RVE Micro Scale Exports ---
+export function testGebart(dp: Real, phi: Real): Real {
+  return gebartPermeability(dp, phi);
+}
+
+export function testGebartSquare(dp: Real, phi: Real): Real {
+  return gebartSquarePermeability(dp, phi);
+}
+
+export function createRve(N: i32, L: Real, dp: Real, phi: Real, mu: Real, fx: Real): void {
+  g_rve.init(N, L, dp, phi, mu, fx);
+}
+
+export function stepRve(dt: Real): void {
+  g_rve.step(dt);
+}
+
+export function getRvePermeability(): Real {
+  return g_rve.getPermeability();
+}
+
+export function getRveVelocity(): Real {
+  return g_rve.getSuperficialVelocity();
+}
+
+export function ptrRveChi(): usize { return g_rve.chi.dataStart; }
+export function ptrRveU(): usize { return g_rve.u.dataStart; }
+export function ptrRveV(): usize { return g_rve.v.dataStart; }
+

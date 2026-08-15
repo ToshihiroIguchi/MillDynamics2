@@ -71,11 +71,18 @@ import { idxC, idxU, idxV } from './grid';
   if (periodic) {
     gx = gx - Math.floor(gx / <Real>N) * <Real>N;
     if (gx < 0.0) gx += <Real>N;
+    if (gx >= <Real>N) gx = 0.0;
     gy = gy - Math.floor(gy / <Real>N) * <Real>N;
     if (gy < 0.0) gy += <Real>N;
+    if (gy >= <Real>N) gy = 0.0;
 
-    const i0 = <i32>Math.floor(gx);
-    const j0 = <i32>Math.floor(gy);
+    let i0 = <i32>Math.floor(gx);
+    let j0 = <i32>Math.floor(gy);
+    if (i0 < 0) i0 = 0;
+    if (i0 >= N) i0 = N - 1;
+    if (j0 < 0) j0 = 0;
+    if (j0 >= N) j0 = N - 1;
+
     const fx = gx - <Real>i0;
     const fy = gy - <Real>j0;
 
@@ -124,11 +131,18 @@ import { idxC, idxU, idxV } from './grid';
   if (periodic) {
     gx = gx - Math.floor(gx / <Real>N) * <Real>N;
     if (gx < 0.0) gx += <Real>N;
+    if (gx >= <Real>N) gx = 0.0;
     gy = gy - Math.floor(gy / <Real>N) * <Real>N;
     if (gy < 0.0) gy += <Real>N;
+    if (gy >= <Real>N) gy = 0.0;
 
-    const i0 = <i32>Math.floor(gx);
-    const j0 = <i32>Math.floor(gy);
+    let i0 = <i32>Math.floor(gx);
+    let j0 = <i32>Math.floor(gy);
+    if (i0 < 0) i0 = 0;
+    if (i0 >= N) i0 = N - 1;
+    if (j0 < 0) j0 = 0;
+    if (j0 >= N) j0 = N - 1;
+
     const fx = gx - <Real>i0;
     const fy = gy - <Real>j0;
 
@@ -436,11 +450,18 @@ export function advectVelocity(
       if (periodic) {
         gx = gx - Math.floor(gx / <Real>N) * <Real>N;
         if (gx < 0.0) gx += <Real>N;
+        if (gx >= <Real>N) gx = 0.0;
         gy = gy - Math.floor(gy / <Real>N) * <Real>N;
         if (gy < 0.0) gy += <Real>N;
+        if (gy >= <Real>N) gy = 0.0;
 
-        const i0 = <i32>Math.floor(gx);
-        const j0 = <i32>Math.floor(gy);
+        let i0 = <i32>Math.floor(gx);
+        let j0 = <i32>Math.floor(gy);
+        if (i0 < 0) i0 = 0;
+        if (i0 >= N) i0 = N - 1;
+        if (j0 < 0) j0 = 0;
+        if (j0 >= N) j0 = N - 1;
+
         const fx = gx - <Real>i0;
         const fy = gy - <Real>j0;
 
@@ -515,11 +536,18 @@ export function advectVelocity(
       if (periodic) {
         gx = gx - Math.floor(gx / <Real>N) * <Real>N;
         if (gx < 0.0) gx += <Real>N;
+        if (gx >= <Real>N) gx = 0.0;
         gy = gy - Math.floor(gy / <Real>N) * <Real>N;
         if (gy < 0.0) gy += <Real>N;
+        if (gy >= <Real>N) gy = 0.0;
 
-        const i0 = <i32>Math.floor(gx);
-        const j0 = <i32>Math.floor(gy);
+        let i0 = <i32>Math.floor(gx);
+        let j0 = <i32>Math.floor(gy);
+        if (i0 < 0) i0 = 0;
+        if (i0 >= N) i0 = N - 1;
+        if (j0 < 0) j0 = 0;
+        if (j0 >= N) j0 = N - 1;
+
         const fx = gx - <Real>i0;
         const fy = gy - <Real>j0;
 
