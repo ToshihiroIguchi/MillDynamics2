@@ -22,8 +22,8 @@ describe('Phase 1c Advection - U8, U9', () => {
     function runScheme(useMacCormack: boolean) {
       e.initTestGrid(N, L, 1); // periodic
 
-      const u = view(e.ptrU(), (N + 1) * N);
-      const v = view(e.ptrV(), N * (N + 1));
+      const u = view(e.ptrTestU(), (N + 1) * N);
+      const v = view(e.ptrTestV(), N * (N + 1));
       for (let k = 0; k < (N + 1) * N; k++) u[k] = U0;
       for (let k = 0; k < N * (N + 1); k++) v[k] = 0.0;
 
@@ -57,7 +57,6 @@ describe('Phase 1c Advection - U8, U9', () => {
         }
       }
 
-      // Center of mass in window around peak
       let sumW = 0, sumWX = 0, sumWY = 0;
       for (let j = 0; j < N; j++) {
         for (let i = 0; i < N; i++) {
@@ -105,7 +104,6 @@ describe('Phase 1c Advection - U8, U9', () => {
     const steps = Math.round(totalTime / dt);
     const actualDt = totalTime / steps;
 
-    // Initial position at (xc + 0.2L, yc)
     const x0 = xc + 0.2 * L;
     const y0 = yc;
     const sigma = 0.05 * L;
@@ -113,8 +111,8 @@ describe('Phase 1c Advection - U8, U9', () => {
     function runRotation(useMacCormack: boolean) {
       e.initTestGrid(N, L, 0);
 
-      const u = view(e.ptrU(), (N + 1) * N);
-      const v = view(e.ptrV(), N * (N + 1));
+      const u = view(e.ptrTestU(), (N + 1) * N);
+      const v = view(e.ptrTestV(), N * (N + 1));
 
       for (let j = 0; j < N; j++) {
         for (let i = 0; i <= N; i++) {

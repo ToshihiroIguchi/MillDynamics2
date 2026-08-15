@@ -1,11 +1,11 @@
 // assembly/multigrid.ts
 import { Real } from './types';
-import { idxC } from './grid';
 
 export class Multigrid {
   nLevels: i32 = 0;
   maxCycles: i32 = 6;
   tol: Real = 1e-5;
+  isPeriodic: bool = false;
 
   sizes: Int32Array = new Int32Array(0);
   dxs: Float64Array = new Float64Array(0);
@@ -16,11 +16,11 @@ export class Multigrid {
   b: Array<Float64Array> = new Array<Float64Array>(0);
   r: Array<Float64Array> = new Array<Float64Array>(0);
 
-  init(N: i32, L: Real, maxCycles: i32 = 6, tol: Real = 1e-5): void {
+  init(N: i32, L: Real, maxCycles: i32 = 6, tol: Real = 1e-5, isPeriodic: bool = false): void {
     this.maxCycles = maxCycles;
     this.tol = tol;
+    this.isPeriodic = isPeriodic;
 
-    // Count levels down to 4x4
     let lvls = 1;
     let curN = N;
     while (curN > 4 && (curN % 2 == 0)) {
@@ -64,7 +64,6 @@ export class Multigrid {
       subtractMean(b0, n0 * n0);
     }
 
-    // Initial zero guess for phi
     zero(phi0, n0 * n0);
 
     const bnorm = l2Norm(b0, n0 * n0);
@@ -112,21 +111,29 @@ export class Multigrid {
     const h2 = this.dxs[l] * this.dxs[l];
     const p = this.phi[l];
     const rhs = this.b[l];
+    const periodic = this.isPeriodic;
 
     for (let s = 0; s < sweeps; s++) {
       for (let colour = 0; colour < 2; colour++) {
         for (let j = 0; j < n; j++) {
           for (let i = ((j + colour) & 1); i < n; i += 2) {
             const k = i + j * n;
-            let sum: Real = 0.0;
-            let cnt: Real = 0.0;
 
-            if (i > 0)     { sum += p[k - 1]; cnt += 1.0; }
-            if (i < n - 1) { sum += p[k + 1]; cnt += 1.0; }
-            if (j > 0)     { sum += p[k - n]; cnt += 1.0; }
-            if (j < n - 1) { sum += p[k + n]; cnt += 1.0; }
-
-            p[k] = (sum - h2 * rhs[k]) / cnt;
+            if (periodic) {
+              const left   = (i > 0)     ? p[k - 1] : p[n - 1 + j * n];
+              const right  = (i < n - 1) ? p[k + 1] : p[0     + j * n];
+              const bottom = (j > 0)     ? p[k - n] : p[i + (n - 1) * n];
+              const top    = (j < n - 1) ? p[k + n] : p[i + 0 * n];
+              p[k] = (left + right + bottom + top - h2 * rhs[k]) * 0.25;
+            } else {
+              let sum: Real = 0.0;
+              let cnt: Real = 0.0;
+              if (i > 0)     { sum += p[k - 1]; cnt += 1.0; }
+              if (i < n - 1) { sum += p[k + 1]; cnt += 1.0; }
+              if (j > 0)     { sum += p[k - n]; cnt += 1.0; }
+              if (j < n - 1) { sum += p[k + n]; cnt += 1.0; }
+              p[k] = (sum - h2 * rhs[k]) / cnt;
+            }
           }
         }
       }
@@ -139,20 +146,29 @@ export class Multigrid {
     const p = this.phi[l];
     const rhs = this.b[l];
     const res = this.r[l];
+    const periodic = this.isPeriodic;
 
     for (let j = 0; j < n; j++) {
       for (let i = 0; i < n; i++) {
         const k = i + j * n;
-        let sum: Real = 0.0;
-        let cnt: Real = 0.0;
 
-        if (i > 0)     { sum += p[k - 1]; cnt += 1.0; }
-        if (i < n - 1) { sum += p[k + 1]; cnt += 1.0; }
-        if (j > 0)     { sum += p[k - n]; cnt += 1.0; }
-        if (j < n - 1) { sum += p[k + n]; cnt += 1.0; }
-
-        const lap = (sum - cnt * p[k]) * invH2;
-        res[k] = rhs[k] - lap;
+        if (periodic) {
+          const left   = (i > 0)     ? p[k - 1] : p[n - 1 + j * n];
+          const right  = (i < n - 1) ? p[k + 1] : p[0     + j * n];
+          const bottom = (j > 0)     ? p[k - n] : p[i + (n - 1) * n];
+          const top    = (j < n - 1) ? p[k + n] : p[i + 0 * n];
+          const lap = (left + right + bottom + top - 4.0 * p[k]) * invH2;
+          res[k] = rhs[k] - lap;
+        } else {
+          let sum: Real = 0.0;
+          let cnt: Real = 0.0;
+          if (i > 0)     { sum += p[k - 1]; cnt += 1.0; }
+          if (i < n - 1) { sum += p[k + 1]; cnt += 1.0; }
+          if (j > 0)     { sum += p[k - n]; cnt += 1.0; }
+          if (j < n - 1) { sum += p[k + n]; cnt += 1.0; }
+          const lap = (sum - cnt * p[k]) * invH2;
+          res[k] = rhs[k] - lap;
+        }
       }
     }
   }
@@ -163,7 +179,6 @@ export class Multigrid {
     const fRes = this.r[fLvl];
     const cRhs = this.b[cLvl];
 
-    // Standard cell-centred full weighting: 2x2 fine cells average into 1 coarse cell
     for (let jc = 0; jc < cN; jc++) {
       const jf = jc << 1;
       for (let ic = 0; ic < cN; ic++) {
@@ -182,23 +197,45 @@ export class Multigrid {
     const fN = this.sizes[fLvl];
     const cPhi = this.phi[cLvl];
     const fPhi = this.phi[fLvl];
+    const periodic = this.isPeriodic;
 
-    // Bilinear prolongation for cell centres
     for (let jf = 0; jf < fN; jf++) {
-      const gy = (<Real>jf + 0.5) * 0.5 - 0.5;
-      let j0 = <i32>Math.floor(gy);
-      let fy = gy - <Real>j0;
-      if (j0 < 0) { j0 = 0; fy = 0.0; }
-      if (j0 > cN - 2) { j0 = cN - 2; fy = 1.0; }
-      const j1 = j0 + 1;
+      let gy = (<Real>jf + 0.5) * 0.5 - 0.5;
+      let j0: i32 = 0, j1: i32 = 0;
+      let fy: Real = 0.0;
+
+      if (periodic) {
+        gy = gy - Math.floor(gy / <Real>cN) * <Real>cN;
+        if (gy < 0.0) gy += <Real>cN;
+        j0 = <i32>Math.floor(gy);
+        j1 = (j0 + 1) % cN;
+        fy = gy - <Real>j0;
+      } else {
+        j0 = <i32>Math.floor(gy);
+        fy = gy - <Real>j0;
+        if (j0 < 0) { j0 = 0; fy = 0.0; }
+        if (j0 > cN - 2) { j0 = cN - 2; fy = 1.0; }
+        j1 = j0 + 1;
+      }
 
       for (let if_ = 0; if_ < fN; if_++) {
-        const gx = (<Real>if_ + 0.5) * 0.5 - 0.5;
-        let i0 = <i32>Math.floor(gx);
-        let fx = gx - <Real>i0;
-        if (i0 < 0) { i0 = 0; fx = 0.0; }
-        if (i0 > cN - 2) { i0 = cN - 2; fx = 1.0; }
-        const i1 = i0 + 1;
+        let gx = (<Real>if_ + 0.5) * 0.5 - 0.5;
+        let i0: i32 = 0, i1: i32 = 0;
+        let fx: Real = 0.0;
+
+        if (periodic) {
+          gx = gx - Math.floor(gx / <Real>cN) * <Real>cN;
+          if (gx < 0.0) gx += <Real>cN;
+          i0 = <i32>Math.floor(gx);
+          i1 = (i0 + 1) % cN;
+          fx = gx - <Real>i0;
+        } else {
+          i0 = <i32>Math.floor(gx);
+          fx = gx - <Real>i0;
+          if (i0 < 0) { i0 = 0; fx = 0.0; }
+          if (i0 > cN - 2) { i0 = cN - 2; fx = 1.0; }
+          i1 = i0 + 1;
+        }
 
         const c00 = cPhi[i0 + j0 * cN];
         const c10 = cPhi[i1 + j0 * cN];
@@ -216,7 +253,6 @@ export class Multigrid {
   }
 }
 
-// Helper functions
 export function subtractMean(arr: Float64Array, len: i32): void {
   let sum: Real = 0.0;
   for (let i = 0; i < len; i++) {
@@ -242,7 +278,6 @@ export function l2Norm(arr: Float64Array, len: i32): Real {
   return Math.sqrt(sumSq / <Real>len);
 }
 
-// Discrete Poisson operator L * phi = div(grad(phi)) with Neumann BC
 export function applyPoisson(out: Float64Array, phi: Float64Array, N: i32, invH2: Real): void {
   for (let j = 0; j < N; j++) {
     for (let i = 0; i < N; i++) {

@@ -9,11 +9,10 @@ describe('Phase 1a Operators - U1, U2, U3, U10', () => {
     const dx = L / N;
     e.initTestGrid(N, L, 1);
 
-    const u = view(e.ptrU(), (N + 1) * N);
-    const v = view(e.ptrV(), N * (N + 1));
+    const u = view(e.ptrTestU(), (N + 1) * N);
+    const v = view(e.ptrTestV(), N * (N + 1));
     const k = 2 * Math.PI / L;
 
-    // u(i, j) at (i*dx, (j+0.5)*dx)
     for (let j = 0; j < N; j++) {
       for (let i = 0; i <= N; i++) {
         const x = i * dx;
@@ -22,7 +21,6 @@ describe('Phase 1a Operators - U1, U2, U3, U10', () => {
       }
     }
 
-    // v(i, j) at ((i+0.5)*dx, j*dx)
     for (let j = 0; j <= N; j++) {
       for (let i = 0; i < N; i++) {
         const x = (i + 0.5) * dx;
@@ -32,7 +30,7 @@ describe('Phase 1a Operators - U1, U2, U3, U10', () => {
     }
 
     e.opDivergence();
-    const div = view(e.ptrDiv(), N * N);
+    const div = view(e.ptrTestDiv(), N * N);
 
     let maxDiv = 0;
     for (let c = 0; c < N * N; c++) {
@@ -52,8 +50,8 @@ describe('Phase 1a Operators - U1, U2, U3, U10', () => {
       const dx = L / N;
       e.initTestGrid(N, L, 0);
 
-      const u = view(e.ptrU(), (N + 1) * N);
-      const v = view(e.ptrV(), N * (N + 1));
+      const u = view(e.ptrTestU(), (N + 1) * N);
+      const v = view(e.ptrTestV(), N * (N + 1));
 
       for (let j = 0; j < N; j++) {
         for (let i = 0; i <= N; i++) {
@@ -66,7 +64,7 @@ describe('Phase 1a Operators - U1, U2, U3, U10', () => {
       }
 
       e.opDivergence();
-      const div = view(e.ptrDiv(), N * N);
+      const div = view(e.ptrTestDiv(), N * N);
 
       let maxErr = 0;
       for (let j = 0; j < N; j++) {
@@ -92,9 +90,9 @@ describe('Phase 1a Operators - U1, U2, U3, U10', () => {
     const dx = L / N;
     e.initTestGrid(N, L, 0);
 
-    const u = view(e.ptrU(), (N + 1) * N);
-    const v = view(e.ptrV(), N * (N + 1));
-    const p = view(e.ptrP(), N * N);
+    const u = view(e.ptrTestU(), (N + 1) * N);
+    const v = view(e.ptrTestV(), N * (N + 1));
+    const p = view(e.ptrTestP(), N * N);
 
     let s = 12345;
     function rand() {
@@ -125,7 +123,7 @@ describe('Phase 1a Operators - U1, U2, U3, U10', () => {
     }
 
     e.opDivergence();
-    const div = view(e.ptrDiv(), N * N);
+    const div = view(e.ptrTestDiv(), N * N);
 
     let innerPDiv = 0;
     for (let c = 0; c < N * N; c++) {
@@ -158,9 +156,9 @@ describe('Phase 1a Operators - U1, U2, U3, U10', () => {
     const dx = L / N;
     e.initTestGrid(N, L, 0);
 
-    const u = view(e.ptrU(), (N + 1) * N);
-    const v = view(e.ptrV(), N * (N + 1));
-    const gd = view(e.ptrGammaDot(), N * N);
+    const u = view(e.ptrTestU(), (N + 1) * N);
+    const v = view(e.ptrTestV(), N * (N + 1));
+    const gd = view(e.ptrTestGammaDot(), N * N);
 
     // Case 1: Simple shear u = (y, 0) => gammaDot = 1.0 exactly
     for (let j = 0; j < N; j++) {
