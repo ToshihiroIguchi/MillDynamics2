@@ -1,0 +1,23 @@
+{
+  "name": "mill-dynamics-2",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "asbuild:debug": "asc assembly/index.ts --target debug",
+    "asbuild": "asc assembly/index.ts --target release",
+    "dev": "npm run asbuild && vite",
+    "build": "npm run asbuild && tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173",
+    "test": "npm run asbuild:debug && vitest run",
+    "smoke": "node scripts/smoke.mjs",
+    "experiments": "node scripts/run_experiments.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "@types/node": "^26.2.0",
+    "assemblyscript": "^0.27.36",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0",
+    "vitest": "^3.0.5"
+  }
+}
