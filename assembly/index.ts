@@ -4,6 +4,7 @@ import { calcDivergence, applyGradient } from './grid';
 import { muApp } from './rheology';
 import { computeStrainRate } from './strain';
 import { Multigrid, applyPoisson, subtractMean, zero, l2Norm } from './multigrid';
+import { advectScalar, advectVelocity } from './advect';
 
 export function add(a: f64, b: f64): f64 {
   return a + b;
@@ -11,11 +12,17 @@ export function add(a: f64, b: f64): f64 {
 
 let g_N: i32 = 0;
 let g_L: Real = 0.0;
+let g_dx: Real = 0.0;
 let g_inv: Real = 0.0;
 let g_periodic: bool = false;
 
 let g_u: Float64Array = new Float64Array(0);
 let g_v: Float64Array = new Float64Array(0);
+let g_uDst: Float64Array = new Float64Array(0);
+let g_vDst: Float64Array = new Float64Array(0);
+let g_uHat: Float64Array = new Float64Array(0);
+let g_vHat: Float64Array = new Float64Array(0);
+
 let g_p: Float64Array = new Float64Array(0);
 let g_div: Float64Array = new Float64Array(0);
 let g_gd: Float64Array = new Float64Array(0);
@@ -23,11 +30,16 @@ let g_muC: Float64Array = new Float64Array(0);
 let g_muN: Float64Array = new Float64Array(0);
 let g_sNode: Float64Array = new Float64Array(0);
 
+let g_scalarSrc: Float64Array = new Float64Array(0);
+let g_scalarDst: Float64Array = new Float64Array(0);
+let g_scalarHat: Float64Array = new Float64Array(0);
+
 const g_mg: Multigrid = new Multigrid();
 
 export function initTestGrid(N: i32, L: Real, periodic: i32): void {
   g_N = N;
   g_L = L;
+  g_dx = L / <Real>N;
   g_inv = <Real>N / L;
   g_periodic = periodic != 0;
 
@@ -38,6 +50,11 @@ export function initTestGrid(N: i32, L: Real, periodic: i32): void {
 
   g_u = new Float64Array(nu);
   g_v = new Float64Array(nv);
+  g_uDst = new Float64Array(nu);
+  g_vDst = new Float64Array(nv);
+  g_uHat = new Float64Array(nu);
+  g_vHat = new Float64Array(nv);
+
   g_p = new Float64Array(nc);
   g_div = new Float64Array(nc);
   g_gd = new Float64Array(nc);
@@ -45,16 +62,24 @@ export function initTestGrid(N: i32, L: Real, periodic: i32): void {
   g_muN = new Float64Array(nn);
   g_sNode = new Float64Array(nn);
 
+  g_scalarSrc = new Float64Array(nc);
+  g_scalarDst = new Float64Array(nc);
+  g_scalarHat = new Float64Array(nc);
+
   g_mg.init(N, L, 10, 1e-6);
 }
 
 export function ptrU(): usize { return g_u.dataStart; }
 export function ptrV(): usize { return g_v.dataStart; }
+export function ptrUDst(): usize { return g_uDst.dataStart; }
+export function ptrVDst(): usize { return g_vDst.dataStart; }
 export function ptrP(): usize { return g_p.dataStart; }
 export function ptrDiv(): usize { return g_div.dataStart; }
 export function ptrGammaDot(): usize { return g_gd.dataStart; }
 export function ptrMu(): usize { return g_muC.dataStart; }
 export function ptrMuN(): usize { return g_muN.dataStart; }
+export function ptrScalarSrc(): usize { return g_scalarSrc.dataStart; }
+export function ptrScalarDst(): usize { return g_scalarDst.dataStart; }
 
 export function opDivergence(): void {
   calcDivergence(g_div, g_u, g_v, g_N, g_inv);
@@ -109,4 +134,21 @@ export function opL2(ptr: usize, len: i32): Real {
 export function opSubMean(ptr: usize, len: i32): void {
   const arr = changetype<Float64Array>(ptr);
   subtractMean(arr, len);
+}
+
+// Advection test exports
+export function opAdvectScalar(dt: Real, useMacCormack: i32, periodic: i32): void {
+  advectScalar(
+    g_scalarDst, g_scalarSrc, g_scalarHat,
+    g_u, g_v, g_N, g_dx, g_inv, dt,
+    useMacCormack != 0, periodic != 0
+  );
+}
+
+export function opAdvectVelocity(dt: Real, useMacCormack: i32, periodic: i32): void {
+  advectVelocity(
+    g_uDst, g_vDst, g_u, g_v, g_uHat, g_vHat,
+    g_N, g_dx, g_inv, dt,
+    useMacCormack != 0, periodic != 0
+  );
 }
