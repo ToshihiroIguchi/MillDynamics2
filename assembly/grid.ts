@@ -154,9 +154,13 @@ export function sampleV(v: Float64Array, N: i32, inv: Real, x: Real, y: Real, pe
     return u[idxU(N, i, N - 1)];
   }
   if (dir > 0) {
-    return 2.0 * uWallTop - u[idxU(N, i, jRef)];
+    const u0 = u[idxU(N, i, N - 1)];
+    const u1 = (N > 1) ? u[idxU(N, i, N - 2)] : u0;
+    return (8.0 / 3.0) * uWallTop - 2.0 * u0 + (1.0 / 3.0) * u1;
   } else {
-    return 2.0 * uWallBot - u[idxU(N, i, jRef)];
+    const u0 = u[idxU(N, i, 0)];
+    const u1 = (N > 1) ? u[idxU(N, i, 1)] : u0;
+    return (8.0 / 3.0) * uWallBot - 2.0 * u0 + (1.0 / 3.0) * u1;
   }
 }
 
@@ -169,9 +173,13 @@ export function sampleV(v: Float64Array, N: i32, inv: Real, x: Real, y: Real, pe
     return v[idxV(N, N - 1, j)];
   }
   if (dir > 0) {
-    return 2.0 * vWallRight - v[idxV(N, iRef, j)];
+    const v0 = v[idxV(N, N - 1, j)];
+    const v1 = (N > 1) ? v[idxV(N, N - 2, j)] : v0;
+    return (8.0 / 3.0) * vWallRight - 2.0 * v0 + (1.0 / 3.0) * v1;
   } else {
-    return 2.0 * vWallLeft - v[idxV(N, iRef, j)];
+    const v0 = v[idxV(N, 0, j)];
+    const v1 = (N > 1) ? v[idxV(N, 1, j)] : v0;
+    return (8.0 / 3.0) * vWallLeft - 2.0 * v0 + (1.0 / 3.0) * v1;
   }
 }
 

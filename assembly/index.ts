@@ -35,6 +35,10 @@ export function setLidVelocity(U: Real): void {
   g_solver.uLid = U;
 }
 
+export function setWallVelocities(uTop: Real, uBot: Real, vRight: Real, vLeft: Real): void {
+  g_solver.uLid = uTop;
+}
+
 export function setBodyForce(fx: Real, fy: Real): void {
   g_solver.bodyFx = fx;
   g_solver.bodyFy = fy;
@@ -160,7 +164,7 @@ export function initTestGrid(N: i32, L: Real, periodic: i32): void {
   g_scalarDst = new Float64Array(nc);
   g_scalarHat = new Float64Array(nc);
 
-  g_mg.init(N, L, 10, 1e-6, g_periodic);
+  g_mg.init(N, L, 10, 1e-6, g_periodic ? 1 : 0);
 }
 
 export function ptrTestU(): usize { return g_u.dataStart; }
@@ -171,6 +175,7 @@ export function ptrTestP(): usize { return g_p.dataStart; }
 export function ptrTestDiv(): usize { return g_div.dataStart; }
 export function ptrTestGammaDot(): usize { return g_gd.dataStart; }
 export function ptrTestMu(): usize { return g_muC.dataStart; }
+export function ptrTestMuC(): usize { return g_muC.dataStart; }
 export function ptrTestMuN(): usize { return g_muN.dataStart; }
 export function ptrScalarSrc(): usize { return g_scalarSrc.dataStart; }
 export function ptrScalarDst(): usize { return g_scalarDst.dataStart; }
@@ -202,7 +207,7 @@ export function testMuApp(gd: Real, K: Real, n: Real, tauY: Real, m: Real, muMin
 export function initMG(N: i32, L: Real, maxCycles: i32, tol: Real): void {
   g_N = N;
   g_L = L;
-  g_mg.init(N, L, maxCycles, tol, false);
+  g_mg.init(N, L, maxCycles, tol, 0);
 }
 
 export function ptrMGPhi(): usize { return g_mg.phi[0].dataStart; }

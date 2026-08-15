@@ -173,7 +173,8 @@ describe('Phase 1d Solver & Operators - U7, U11, U12, V4, V5', () => {
     const rho = 1.0;
     const mu = 0.01;
     const nu = mu / rho;
-    const k = 2.0 * Math.PI / L;
+    const k = 1.0;
+    const kappa = 2.0 * Math.PI * k / L;
     const tEnd = 0.02;
 
     const N = 64;
@@ -197,7 +198,7 @@ describe('Phase 1d Solver & Operators - U7, U11, U12, V4, V5', () => {
 
     const finalKE = e.diagKineticEnergy();
     const measuredDecay = finalKE / initialKE;
-    const analyticalDecay = Math.exp(-4.0 * nu * k * k * tEnd);
+    const analyticalDecay = Math.exp(-4.0 * nu * kappa * kappa * tEnd);
     const decayRelError = Math.abs(measuredDecay - analyticalDecay) / analyticalDecay;
 
     console.log(`V4 Kinetic Energy decay: measured=${measuredDecay.toFixed(6)}, analytical=${analyticalDecay.toFixed(6)}, relErr=${(decayRelError * 100).toFixed(3)}%`);

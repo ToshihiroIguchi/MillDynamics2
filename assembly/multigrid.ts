@@ -1,11 +1,11 @@
 // assembly/multigrid.ts
-import { Real } from './types';
+import { Real, MODE_PERIODIC, MODE_CHANNEL } from './types';
 
 export class Multigrid {
   nLevels: i32 = 0;
   maxCycles: i32 = 6;
   tol: Real = 1e-5;
-  isPeriodic: bool = false;
+  boundaryMode: i32 = 0;
 
   sizes: Int32Array = new Int32Array(0);
   dxs: Float64Array = new Float64Array(0);
@@ -16,10 +16,10 @@ export class Multigrid {
   b: Array<Float64Array> = new Array<Float64Array>(0);
   r: Array<Float64Array> = new Array<Float64Array>(0);
 
-  init(N: i32, L: Real, maxCycles: i32 = 6, tol: Real = 1e-5, isPeriodic: bool = false): void {
+  init(N: i32, L: Real, maxCycles: i32 = 6, tol: Real = 1e-5, mode: i32 = 0): void {
     this.maxCycles = maxCycles;
     this.tol = tol;
-    this.isPeriodic = isPeriodic;
+    this.boundaryMode = mode;
 
     let lvls = 1;
     let curN = N;
@@ -111,7 +111,8 @@ export class Multigrid {
     const h2 = this.dxs[l] * this.dxs[l];
     const p = this.phi[l];
     const rhs = this.b[l];
-    const periodic = this.isPeriodic;
+    const isXPeriodic = (this.boundaryMode == MODE_PERIODIC || this.boundaryMode == MODE_CHANNEL);
+    const isYPeriodic = (this.boundaryMode == MODE_PERIODIC);
 
     for (let s = 0; s < sweeps; s++) {
       for (let colour = 0; colour < 2; colour++) {
@@ -119,21 +120,32 @@ export class Multigrid {
           for (let i = ((j + colour) & 1); i < n; i += 2) {
             const k = i + j * n;
 
-            if (periodic) {
-              const left   = (i > 0)     ? p[k - 1] : p[n - 1 + j * n];
-              const right  = (i < n - 1) ? p[k + 1] : p[0     + j * n];
-              const bottom = (j > 0)     ? p[k - n] : p[i + (n - 1) * n];
-              const top    = (j < n - 1) ? p[k + n] : p[i + 0 * n];
-              p[k] = (left + right + bottom + top - h2 * rhs[k]) * 0.25;
+            let sum: Real = 0.0;
+            let cnt: Real = 0.0;
+
+            // X-direction
+            if (isXPeriodic) {
+              const left  = (i > 0)     ? p[k - 1] : p[n - 1 + j * n];
+              const right = (i < n - 1) ? p[k + 1] : p[0     + j * n];
+              sum += left + right;
+              cnt += 2.0;
             } else {
-              let sum: Real = 0.0;
-              let cnt: Real = 0.0;
               if (i > 0)     { sum += p[k - 1]; cnt += 1.0; }
               if (i < n - 1) { sum += p[k + 1]; cnt += 1.0; }
+            }
+
+            // Y-direction
+            if (isYPeriodic) {
+              const bottom = (j > 0)     ? p[k - n] : p[i + (n - 1) * n];
+              const top    = (j < n - 1) ? p[k + n] : p[i + 0 * n];
+              sum += bottom + top;
+              cnt += 2.0;
+            } else {
               if (j > 0)     { sum += p[k - n]; cnt += 1.0; }
               if (j < n - 1) { sum += p[k + n]; cnt += 1.0; }
-              p[k] = (sum - h2 * rhs[k]) / cnt;
             }
+
+            p[k] = (sum - h2 * rhs[k]) / cnt;
           }
         }
       }
@@ -146,29 +158,37 @@ export class Multigrid {
     const p = this.phi[l];
     const rhs = this.b[l];
     const res = this.r[l];
-    const periodic = this.isPeriodic;
+    const isXPeriodic = (this.boundaryMode == MODE_PERIODIC || this.boundaryMode == MODE_CHANNEL);
+    const isYPeriodic = (this.boundaryMode == MODE_PERIODIC);
 
     for (let j = 0; j < n; j++) {
       for (let i = 0; i < n; i++) {
         const k = i + j * n;
+        let sum: Real = 0.0;
+        let cnt: Real = 0.0;
 
-        if (periodic) {
-          const left   = (i > 0)     ? p[k - 1] : p[n - 1 + j * n];
-          const right  = (i < n - 1) ? p[k + 1] : p[0     + j * n];
-          const bottom = (j > 0)     ? p[k - n] : p[i + (n - 1) * n];
-          const top    = (j < n - 1) ? p[k + n] : p[i + 0 * n];
-          const lap = (left + right + bottom + top - 4.0 * p[k]) * invH2;
-          res[k] = rhs[k] - lap;
+        if (isXPeriodic) {
+          const left  = (i > 0)     ? p[k - 1] : p[n - 1 + j * n];
+          const right = (i < n - 1) ? p[k + 1] : p[0     + j * n];
+          sum += left + right;
+          cnt += 2.0;
         } else {
-          let sum: Real = 0.0;
-          let cnt: Real = 0.0;
           if (i > 0)     { sum += p[k - 1]; cnt += 1.0; }
           if (i < n - 1) { sum += p[k + 1]; cnt += 1.0; }
+        }
+
+        if (isYPeriodic) {
+          const bottom = (j > 0)     ? p[k - n] : p[i + (n - 1) * n];
+          const top    = (j < n - 1) ? p[k + n] : p[i + 0 * n];
+          sum += bottom + top;
+          cnt += 2.0;
+        } else {
           if (j > 0)     { sum += p[k - n]; cnt += 1.0; }
           if (j < n - 1) { sum += p[k + n]; cnt += 1.0; }
-          const lap = (sum - cnt * p[k]) * invH2;
-          res[k] = rhs[k] - lap;
         }
+
+        const lap = (sum - cnt * p[k]) * invH2;
+        res[k] = rhs[k] - lap;
       }
     }
   }
@@ -197,14 +217,15 @@ export class Multigrid {
     const fN = this.sizes[fLvl];
     const cPhi = this.phi[cLvl];
     const fPhi = this.phi[fLvl];
-    const periodic = this.isPeriodic;
+    const isXPeriodic = (this.boundaryMode == MODE_PERIODIC || this.boundaryMode == MODE_CHANNEL);
+    const isYPeriodic = (this.boundaryMode == MODE_PERIODIC);
 
     for (let jf = 0; jf < fN; jf++) {
       let gy = (<Real>jf + 0.5) * 0.5 - 0.5;
       let j0: i32 = 0, j1: i32 = 0;
       let fy: Real = 0.0;
 
-      if (periodic) {
+      if (isYPeriodic) {
         gy = gy - Math.floor(gy / <Real>cN) * <Real>cN;
         if (gy < 0.0) gy += <Real>cN;
         j0 = <i32>Math.floor(gy);
@@ -223,7 +244,7 @@ export class Multigrid {
         let i0: i32 = 0, i1: i32 = 0;
         let fx: Real = 0.0;
 
-        if (periodic) {
+        if (isXPeriodic) {
           gx = gx - Math.floor(gx / <Real>cN) * <Real>cN;
           if (gx < 0.0) gx += <Real>cN;
           i0 = <i32>Math.floor(gx);

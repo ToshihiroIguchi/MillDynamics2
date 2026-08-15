@@ -1,5 +1,5 @@
 // assembly/strain.ts
-import { Real } from './types';
+import { Real, MODE_PERIODIC, MODE_CHANNEL } from './types';
 import { idxC, idxU, idxV, idxN, ghostU, ghostV } from './grid';
 import { muApp } from './rheology';
 
@@ -24,18 +24,22 @@ export function computeStrainRate(
   vWallRight: Real = 0.0,
   vWallLeft: Real = 0.0
 ): void {
-  // dudy + dvdx at nodes (i,j) in [0,N] x [0,N]
+  const isXPeriodic = (mode == MODE_PERIODIC || mode == MODE_CHANNEL);
+  const isYPeriodic = (mode == MODE_PERIODIC);
+
+  // 1. Shear strain rate (dudy + dvdx) at nodes (i,j) in [0,N] x [0,N]
   for (let j = 0; j <= N; j++) {
     for (let i = 0; i <= N; i++) {
-      const uUp = (j < N) ? u[idxU(N, i, j)]     : ghostU(u, N, i, N - 1, +1, mode, uWallTop, uWallBot);
-      const uDn = (j > 0) ? u[idxU(N, i, j - 1)] : ghostU(u, N, i, 0,     -1, mode, uWallTop, uWallBot);
-      const vRt = (i < N) ? v[idxV(N, i, j)]     : ghostV(v, N, N - 1, j, +1, mode, vWallRight, vWallLeft);
-      const vLf = (i > 0) ? v[idxV(N, i - 1, j)] : ghostV(v, N, 0,     j, -1, mode, vWallRight, vWallLeft);
-      sNode[idxN(N, i, j)] = (uUp - uDn) * inv + (vRt - vLf) * inv;
+      const uUp = (j < N) ? u[idxU(N, i, j)]     : (isYPeriodic ? u[idxU(N, i, 0)]     : ghostU(u, N, i, N - 1, +1, mode, uWallTop, uWallBot));
+      const uDn = (j > 0) ? u[idxU(N, i, j - 1)] : (isYPeriodic ? u[idxU(N, i, N - 1)] : ghostU(u, N, i, 0,     -1, mode, uWallTop, uWallBot));
+      const vRt = (i < N) ? v[idxV(N, i, j)]     : (isXPeriodic ? v[idxV(N, 0, j)]     : ghostV(v, N, N - 1, j, +1, mode, vWallRight, vWallLeft));
+      const vLf = (i > 0) ? v[idxV(N, i - 1, j)] : (isXPeriodic ? v[idxV(N, N - 1, j)] : ghostV(v, N, 0,     j, -1, mode, vWallRight, vWallLeft));
+      const s = (uUp - uDn) * inv + (vRt - vLf) * inv;
+      sNode[idxN(N, i, j)] = s;
     }
   }
 
-  // gamma-dot at centres
+  // 2. gamma-dot and mu at cell centres
   for (let j = 0; j < N; j++) {
     for (let i = 0; i < N; i++) {
       const c = idxC(N, i, j);
@@ -51,15 +55,11 @@ export function computeStrainRate(
     }
   }
 
-  // node viscosity = arithmetic mean of the 4 surrounding centres (clamp first!)
+  // 3. Direct node viscosity from node shear strain rate (prevents double-averaging yield blurring)
   for (let j = 0; j <= N; j++) {
     for (let i = 0; i <= N; i++) {
-      const i0 = i > 0 ? i - 1 : 0, i1 = i < N ? i : N - 1;
-      const j0 = j > 0 ? j - 1 : 0, j1 = j < N ? j : N - 1;
-      muN[idxN(N, i, j)] = 0.25 * (
-        muC[idxC(N, i0, j0)] + muC[idxC(N, i1, j0)] +
-        muC[idxC(N, i0, j1)] + muC[idxC(N, i1, j1)]
-      );
+      const s = Math.abs(sNode[idxN(N, i, j)]);
+      muN[idxN(N, i, j)] = muApp(s, K, n, tauY, m, muMin, muMax);
     }
   }
 }

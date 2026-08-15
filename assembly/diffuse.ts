@@ -45,6 +45,34 @@ export function computeViscousDivergence(
 
       outU[k] = dxx + dyy;
     }
+
+    if (mode == MODE_PERIODIC || mode == MODE_CHANNEL) {
+      const k0 = idxU(N, 0, j);
+      const mR = muC[idxC(N, 0,     j)];
+      const mL = muC[idxC(N, N - 1, j)];
+      const mT = muN[idxN(N, 0, j + 1)];
+      const mB = muN[idxN(N, 0, j)];
+
+      const uR = u[idxU(N, 1, j)];
+      const uC = u[k0];
+      const uL = u[idxU(N, N - 1, j)];
+      const uT = (j < N - 1) ? u[idxU(N, 0, j + 1)] : ghostU(u, N, 0, N - 1, +1, mode, uWallTop, uWallBot);
+      const uB = (j > 0)     ? u[idxU(N, 0, j - 1)] : ghostU(u, N, 0, 0,     -1, mode, uWallTop, uWallBot);
+
+      const vTR = v[idxV(N, 0, j + 1)];
+      const vTL = v[idxV(N, N - 1, j + 1)];
+      const vBR = v[idxV(N, 0, j)];
+      const vBL = v[idxV(N, N - 1, j)];
+
+      const dxx = (2.0 * mR * (uR - uC) - 2.0 * mL * (uC - uL)) * invDx2;
+      const dyy = (mT * ((uT - uC) * inv + (vTR - vTL) * inv) - mB * ((uC - uB) * inv + (vBR - vBL) * inv)) * inv;
+
+      outU[k0] = dxx + dyy;
+      outU[idxU(N, N, j)] = outU[k0];
+    } else {
+      outU[idxU(N, 0, j)] = 0.0;
+      outU[idxU(N, N, j)] = 0.0;
+    }
   }
 
   // L_mu v
@@ -71,6 +99,37 @@ export function computeViscousDivergence(
       const dxx = (mR * ((vR - vC) * inv + (uRT - uRB) * inv) - mL * ((vC - vL) * inv + (uLT - uLB) * inv)) * inv;
 
       outV[k] = dxx + dyy;
+    }
+  }
+  if (mode == MODE_PERIODIC) {
+    for (let i = 0; i < N; i++) {
+      const k0 = idxV(N, i, 0);
+      const mT = muC[idxC(N, i, 0)];
+      const mB = muC[idxC(N, i, N - 1)];
+      const mR = muN[idxN(N, i + 1, 0)];
+      const mL = muN[idxN(N, i,     0)];
+
+      const vT = v[idxV(N, i, 1)];
+      const vC = v[k0];
+      const vB = v[idxV(N, i, N - 1)];
+      const vR = (i < N - 1) ? v[idxV(N, i + 1, 0)] : ghostV(v, N, N - 1, 0, +1, mode, vWallRight, vWallLeft);
+      const vL = (i > 0)     ? v[idxV(N, i - 1, 0)] : ghostV(v, N, 0,     0, -1, mode, vWallRight, vWallLeft);
+
+      const uRT = u[idxU(N, i + 1, 0)];
+      const uRB = u[idxU(N, i + 1, N - 1)];
+      const uLT = u[idxU(N, i,     0)];
+      const uLB = u[idxU(N, i,     N - 1)];
+
+      const dyy = (2.0 * mT * (vT - vC) - 2.0 * mB * (vC - vB)) * invDx2;
+      const dxx = (mR * ((vR - vC) * inv + (uRT - uRB) * inv) - mL * ((vC - vL) * inv + (uLT - uLB) * inv)) * inv;
+
+      outV[k0] = dxx + dyy;
+      outV[idxV(N, i, N)] = outV[k0];
+    }
+  } else {
+    for (let i = 0; i < N; i++) {
+      outV[idxV(N, i, 0)] = 0.0;
+      outV[idxV(N, i, N)] = 0.0;
     }
   }
 }
