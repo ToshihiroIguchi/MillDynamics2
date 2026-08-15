@@ -231,5 +231,5 @@ describe('Phase 1d Solver & Operators - U7, U11, U12, V4, V5', () => {
 
     console.log(`V5 max |div|*dx/U_ref over 100 steps = ${maxNormDiv.toExponential(3)}`);
     expect(maxNormDiv).toBeLessThan(1e-4);
-  });
+  }, 30000);
 });

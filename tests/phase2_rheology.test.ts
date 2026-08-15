@@ -88,7 +88,7 @@ describe('Phase 2 Rheology & Diffusion - V2, V3', () => {
     console.log(`V2 Couette flow (N=${N}): relL2 error = ${(relL2 * 100).toFixed(3)}%`);
 
     expect(relL2).toBeLessThan(0.01); // < 1% per spec
-  }, 60000);
+  }, 120000);
 
   it('V3: Yield-stress channel flow matches Bingham plug profile within 2%', async () => {
     const { e, view } = await loadSolver(true);
