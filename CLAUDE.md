@@ -65,6 +65,8 @@ These were decided with the user and must not be changed without asking:
 | `docs/PHYSICS.md` | Governing equations, closures, modelling assumptions and their justification |
 | `docs/NUMERICS.md` | Discretisation, time integration, solver algorithms, stability limits |
 | `docs/PARAMETERS.md` | **Every runtime-adjustable parameter** with unit, default, range and validity warnings — the single source of truth |
+| `docs/KERNEL_REFERENCE.md` | Working code for the error-prone kernels: staggered indexing, cross-sampling, the Jacobi diagonal, the V-cycle, SDFs, the torque sign, sanity magnitudes |
+| `docs/TESTING.md` | Solver configuration for each verification case, integrity rules, the Python venv policy, and a bug/symptom table |
 | `docs/IMPLEMENTATION_PLAN.md` | Phase-by-phase build plan for Gemini, with file-level specs, exact commands and definitions of done |
 | `docs/EXPERIMENT_PLAN.md` | Verification cases (V1–V10) and parametric studies (E1–E7) |
 | `docs/VALIDATION.md` | Results, written by Gemini as phases complete |
@@ -82,4 +84,8 @@ These were decided with the user and must not be changed without asking:
   solver construction.
 - Every physical model gets a unit-tested analytical counterpart where one
   exists; see `docs/EXPERIMENT_PLAN.md`.
-- Never report a simulation as validated without a number and a tolerance.
+- Never report a simulation as validated without a number and a tolerance, and
+  never write down a benchmark reference value that was not obtained from its
+  source.
+- Python runs only inside the project venv, invoked by explicit path
+  (`.venv/Scripts/python`). Never install into the system interpreter.

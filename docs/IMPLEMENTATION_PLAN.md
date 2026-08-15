@@ -5,7 +5,10 @@ Nine phases. Each phase lists what to build, the exact commands to run, and a
 end of each phase with the prefix `phase-N:`.
 
 Read `PHYSICS.md`, `NUMERICS.md` and `PARAMETERS.md` first — they are the
-specification; this document is the schedule.
+specification; this document is the schedule. `KERNEL_REFERENCE.md` gives
+working code for the parts that are easy to get wrong, and `TESTING.md` gives the
+solver configuration needed to run each verification case. Consult both before
+improvising.
 
 **Standing constraint across all phases**: every quantity listed in
 `PARAMETERS.md` is a runtime parameter. Mill diameter, lifter geometry, media
@@ -21,6 +24,7 @@ config schema.
 MillDynamics2/
 ├── CLAUDE.md  GEMINI.md  README.md  LICENSE
 ├── package.json  tsconfig.json  vite.config.ts  asconfig.json  .gitignore
+├── requirements.txt               # pinned Python deps, installed into .venv/
 ├── index.html
 ├── .github/workflows/pages.yml
 ├── assembly/                      # AssemblyScript → WASM (the solver)
@@ -67,6 +71,7 @@ MillDynamics2/
 ├── results/                       # experiment CSVs (git-ignored above 1 MB)
 └── docs/
     ├── PHYSICS.md  NUMERICS.md  PARAMETERS.md
+    ├── KERNEL_REFERENCE.md  TESTING.md
     ├── IMPLEMENTATION_PLAN.md  EXPERIMENT_PLAN.md
     ├── VALIDATION.md              # you write this
     ├── closure_table.json         # produced by E6
@@ -81,7 +86,7 @@ MillDynamics2/
 
 ```bash
 cd C:/Users/toshi/python/MillDynamics2
-git init
+# git is already initialised with the specification commit on `main`
 npm init -y
 npm i -D typescript vite vitest assemblyscript @playwright/test
 npx asinit .            # accept; it creates assembly/, build/, asconfig.json
@@ -140,7 +145,13 @@ served over HTTP** — opening it via `file://` fails on CORS. `npm run preview`
 - [ ] A trivial exported `add(a: f64, b: f64): f64` is callable from both a Vitest
       test (Node, `fs.readFileSync` + `WebAssembly.instantiate`) and the browser.
 - [ ] `npm run preview` serves a page that logs the WASM result to the console.
-- [ ] `.gitignore` covers `node_modules/`, `dist/`, `assembly/build/`, `.venv/`.
+- [ ] `.gitignore` covers `node_modules/`, `dist/`, `assembly/build/`, `.venv/`
+      (already committed — verify, do not rewrite).
+- [ ] Python venv created and `requirements.txt` committed:
+      `python -m venv .venv && .venv/Scripts/pip install numpy scipy matplotlib`,
+      then `.venv/Scripts/pip freeze > requirements.txt`. Verify with
+      `.venv/Scripts/python -c "import numpy, scipy; print('ok')"`.
+      Never install into the system Python — see `TESTING.md` §5.
 
 ---
 
@@ -157,12 +168,26 @@ right-hand side** for the pure-Neumann case.
 **Exports added**
 
 ```
-createSolver(n: i32, L: f64, periodic: bool): void
+createSolver(n: i32, L: f64): void
 setFluid(rho: f64, mu: f64): void
+setBoundaryMode(mode: i32): void        // 0 MILL 1 PERIODIC 2 CAVITY 3 CHANNEL 4 INFLOW 5 COUETTE
+setLidVelocity(U: f64): void
+setBodyForce(fx: f64, fy: f64): void
+setInflow(U: f64): void
+setFixedTimeStep(dt: f64): void         // 0 = adaptive
+setInitialField(kind: i32, amp: f64, k: f64): void   // 1 = Taylor-Green
 step(dt: f64): void
 ptrU(): usize   ptrV(): usize   ptrP(): usize
 diagMaxDiv(): f64   diagKineticEnergy(): f64   diagMaxVel(): f64
 ```
+
+**The boundary modes are not optional and not deferrable.** V1 needs a driven
+lid, V2/V3 need a periodic channel with a body force, V4 needs full periodicity,
+V6 needs inflow/outflow. Without them the verification suite cannot be written at
+all, and every later phase would be built on an unverified core. Implement them
+in Phase 1 alongside the solver, exactly as tabulated in `TESTING.md` §2–3 —
+including the mode-4 exception where `subtractMean` must be **skipped** because
+the outflow column makes the Poisson problem non-singular.
 
 **Verification** (see `EXPERIMENT_PLAN.md` for tolerances): V1 lid-driven cavity
 vs. Ghia et al., V4 Taylor–Green decay, V5 divergence.
@@ -408,7 +433,7 @@ parametric studies scriptable.
 ```bash
 node scripts/headless_run.mjs --preset baseline --t 20 --n 256 --out results/baseline.csv
 node scripts/run_experiments.mjs            # runs E1–E5, E7
-python scripts/fit_closure.py               # E6 → docs/closure_table.json
+.venv/Scripts/python scripts/fit_closure.py   # E6 → docs/closure_table.json
 ```
 
 Run experiments **E1–E7** as specified in `EXPERIMENT_PLAN.md`, then have the
@@ -472,7 +497,7 @@ node scripts/headless_run.mjs --preset baseline --t 20 --out results/baseline.cs
 node scripts/headless_run.mjs --preset newtonian --t 20 --out results/newtonian.csv
 
 # 6. full experiment suite (long; run once at the end)
-npm run experiments && python scripts/fit_closure.py
+npm run experiments && .venv/Scripts/python scripts/fit_closure.py
 ```
 
 Manual checks in the browser that no automated test replaces:

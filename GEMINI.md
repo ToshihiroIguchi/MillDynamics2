@@ -34,10 +34,18 @@ specification; your job is to build it, test it, and prove it works.
 1. Read `docs/PHYSICS.md` (what is being solved and why).
 2. Read `docs/NUMERICS.md` (how it is discretised).
 3. Read `docs/PARAMETERS.md` (every runtime-adjustable parameter, with ranges).
-4. Read `docs/IMPLEMENTATION_PLAN.md` (what to build, in what order).
-5. Read `docs/EXPERIMENT_PLAN.md` (how correctness is demonstrated).
+4. Read `docs/KERNEL_REFERENCE.md` (working code for the parts that are easy to
+   get wrong — staggered indexing, cross-sampling, the Jacobi diagonal, the
+   V-cycle, SDFs, the torque sign, and the sanity-magnitude table).
+5. Read `docs/TESTING.md` (how to configure the solver for each verification
+   case, the integrity rules, and the bug/symptom table).
+6. Read `docs/IMPLEMENTATION_PLAN.md` (what to build, in what order).
+7. Read `docs/EXPERIMENT_PLAN.md` (which cases must pass, and to what tolerance).
 
 Then start at Phase 0.
+
+When something looks ambiguous, the answer is almost always already in
+`KERNEL_REFERENCE.md` or `TESTING.md`. Check there before improvising.
 
 ## Hard constraints
 
@@ -62,7 +70,40 @@ Then start at Phase 0.
   your diagnosis in `docs/VALIDATION.md` under "Deviations from spec", and keep
   the failing test marked `.fails` rather than deleting it.
 - **Report failures honestly.** A summary that says "all tests pass" when they do
-  not is worse than no summary.
+  not is worse than no summary. Only claim tests pass if you ran them in this
+  session and saw the output.
+- **Never invent reference data.** Benchmark values (Ghia's cavity tables,
+  Dennis & Chang's drag coefficients, Gebart's permeability) must come from the
+  real source, cross-checked against two independent references. If you cannot
+  obtain one, mark that case BLOCKED in `docs/VALIDATION.md`. A blocked case is
+  honest; a fabricated number destroys the value of the entire validation.
+- **A phase whose Definition of Done does not fully pass does not advance.** Do
+  not build Phase 5 on a broken Phase 3.
+- **Python only inside the project venv** — see below.
+
+## Python environment
+
+Python is used for the closure fitting (`scripts/fit_closure.py`, experiment E6)
+and offline analysis. **Never install into the system Python.**
+
+```bash
+python -m venv .venv
+.venv/Scripts/python -m pip install --upgrade pip
+.venv/Scripts/pip install -r requirements.txt      # commit this file
+```
+
+Always invoke the venv interpreter **by explicit path**:
+
+```bash
+.venv/Scripts/python scripts/fit_closure.py
+.venv/Scripts/python -m pytest benchmarks/
+```
+
+Do not rely on `activate` — shell state does not persist between tool calls in an
+automated workflow, so a bare `python` silently falls through to the system
+interpreter. Anywhere the documentation writes `python …`, it means
+`.venv/Scripts/python …` on this machine (`.venv/bin/python` on POSIX/CI).
+`.venv/` is git-ignored.
 
 ## Verification you must run before declaring a phase done
 

@@ -51,6 +51,8 @@ In short: **no free surface** (single phase ⇒ flooded mill), **2D only**, and
 | [`docs/PHYSICS.md`](docs/PHYSICS.md) | Equations, closures, assumptions |
 | [`docs/NUMERICS.md`](docs/NUMERICS.md) | Discretisation and solver algorithms |
 | [`docs/PARAMETERS.md`](docs/PARAMETERS.md) | Every adjustable parameter, with defaults and ranges |
+| [`docs/KERNEL_REFERENCE.md`](docs/KERNEL_REFERENCE.md) | Reference code for the error-prone kernels |
+| [`docs/TESTING.md`](docs/TESTING.md) | How to run each verification case |
 | [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) | Phased build plan |
 | [`docs/EXPERIMENT_PLAN.md`](docs/EXPERIMENT_PLAN.md) | Verification cases and studies |
 | [`docs/VALIDATION.md`](docs/VALIDATION.md) | Measured results |
@@ -63,6 +65,15 @@ npm run dev       # build WASM + Vite dev server on :3000
 npm run test      # analytical verification suite
 npm run build     # static bundle into dist/
 npm run preview   # serve the built bundle on :4173
+```
+
+Python is used only for the offline closure fitting (experiment E6) and
+analysis, and always inside a project-local virtual environment:
+
+```bash
+python -m venv .venv
+.venv/Scripts/pip install -r requirements.txt      # .venv/bin/pip on POSIX
+.venv/Scripts/python scripts/fit_closure.py
 ```
 
 > The simulator fetches a `.wasm` module, so `dist/index.html` must be served
