@@ -8,6 +8,8 @@ import { advectScalar, advectVelocity } from './advect';
 import { computeViscousDivergence, diffuseVelocity } from './diffuse';
 import { penalizeVelocity } from './penalize';
 import { updateMillSolidMask, updateCylinderSolidMask, updateTaylorCouetteSolidMask } from './sdf';
+import { updateBedMask, solveChordOffset } from './bed';
+import { applyPorousDrag, computePermeability } from './porous';
 import { Solver } from './solver';
 
 export function add(a: f64, b: f64): f64 {
@@ -67,6 +69,20 @@ export function setCylinderGeometry(R: Real): void {
   g_solver.cylRadius = R;
 }
 
+export function setBedParameters(
+  J: Real, thetaRepose: Real, kSlip: Real,
+  epsilon: Real, dp: Real, A: Real, B: Real, C_gamma: Real
+): void {
+  g_solver.fillJ = J;
+  g_solver.thetaRepose = thetaRepose;
+  g_solver.kSlip = kSlip;
+  g_solver.epsilon = epsilon;
+  g_solver.dp = dp;
+  g_solver.A_ergun = A;
+  g_solver.B_ergun = B;
+  g_solver.C_gamma = C_gamma;
+}
+
 export function setFixedTimeStep(dt: Real): void {
   g_solver.fixedDt = dt;
 }
@@ -117,6 +133,9 @@ export function ptrMuN(): usize { return g_solver.muN.dataStart; }
 export function ptrChi(): usize { return g_solver.chi.dataStart; }
 export function ptrUSolid(): usize { return g_solver.uSolid.dataStart; }
 export function ptrVSolid(): usize { return g_solver.vSolid.dataStart; }
+export function ptrChiBed(): usize { return g_solver.chiBed.dataStart; }
+export function ptrUMedia(): usize { return g_solver.uMedia.dataStart; }
+export function ptrVMedia(): usize { return g_solver.vMedia.dataStart; }
 
 export function diagMaxDiv(): Real { return g_solver.diagMaxDiv(); }
 export function diagKineticEnergy(): Real { return g_solver.diagKineticEnergy(); }
@@ -124,6 +143,9 @@ export function diagMaxVel(): Real { return g_solver.diagMaxVel(); }
 export function diagYieldedFraction(): Real { return g_solver.diagYieldedFraction(); }
 export function diagTorque(): Real { return g_solver.diagTorque(); }
 export function diagCylinderDrag(U_inf: Real, d_cyl: Real): Real { return g_solver.diagCylinderDrag(U_inf, d_cyl); }
+export function diagBedArea(): Real { return g_solver.diagBedArea(); }
+export function diagBedMeanShearRate(): Real { return g_solver.diagBedMeanShearRate(); }
+export function diagFreeMeanShearRate(): Real { return g_solver.diagFreeMeanShearRate(); }
 
 // --- Operator Unit Testing Flat Buffers & Wrappers ---
 let g_N: i32 = 0;
@@ -149,6 +171,9 @@ let g_sNode: Float64Array = new Float64Array(0);
 let g_chi: Float64Array = new Float64Array(0);
 let g_uSolid: Float64Array = new Float64Array(0);
 let g_vSolid: Float64Array = new Float64Array(0);
+let g_chiBed: Float64Array = new Float64Array(0);
+let g_uMedia: Float64Array = new Float64Array(0);
+let g_vMedia: Float64Array = new Float64Array(0);
 
 let g_scalarSrc: Float64Array = new Float64Array(0);
 let g_scalarDst: Float64Array = new Float64Array(0);
@@ -185,6 +210,9 @@ export function initTestGrid(N: i32, L: Real, periodic: i32): void {
   g_chi = new Float64Array(nc);
   g_uSolid = new Float64Array(nu);
   g_vSolid = new Float64Array(nv);
+  g_chiBed = new Float64Array(nc);
+  g_uMedia = new Float64Array(nu);
+  g_vMedia = new Float64Array(nv);
 
   g_scalarSrc = new Float64Array(nc);
   g_scalarDst = new Float64Array(nc);
@@ -206,6 +234,9 @@ export function ptrTestMuN(): usize { return g_muN.dataStart; }
 export function ptrTestChi(): usize { return g_chi.dataStart; }
 export function ptrTestUSolid(): usize { return g_uSolid.dataStart; }
 export function ptrTestVSolid(): usize { return g_vSolid.dataStart; }
+export function ptrTestChiBed(): usize { return g_chiBed.dataStart; }
+export function ptrTestUMedia(): usize { return g_uMedia.dataStart; }
+export function ptrTestVMedia(): usize { return g_vMedia.dataStart; }
 export function ptrScalarSrc(): usize { return g_scalarSrc.dataStart; }
 export function ptrScalarDst(): usize { return g_scalarDst.dataStart; }
 
@@ -308,6 +339,34 @@ export function opUpdateTaylorCouetteSolidMask(R_i: Real, R_o: Real, omega_i: Re
     g_chi, g_uSolid, g_vSolid, g_N, g_dx,
     0.5 * g_L, 0.5 * g_L, R_i, R_o, omega_i, omega_o
   );
+}
+
+export function opUpdateBedMask(R: Real, J: Real, thetaRepose: Real, omega: Real, kSlip: Real): void {
+  updateBedMask(
+    g_chiBed, g_uMedia, g_vMedia,
+    g_N, g_dx, 0.5 * g_L, 0.5 * g_L,
+    R, J, thetaRepose, omega, kSlip
+  );
+}
+
+export function opApplyPorousDrag(
+  dt: Real, rho: Real, epsilon: Real, dp: Real,
+  A: Real, B: Real, C_gamma: Real,
+  K: Real, n: Real, tauY: Real, m: Real, muMin: Real, muMax: Real
+): void {
+  applyPorousDrag(
+    g_u, g_v, g_uMedia, g_vMedia, g_chiBed, g_gd,
+    g_N, dt, rho, epsilon, dp,
+    A, B, C_gamma, K, n, tauY, m, muMin, muMax
+  );
+}
+
+export function testSolveChordOffset(R: Real, J: Real): Real {
+  return solveChordOffset(R, J);
+}
+
+export function testPermeability(epsilon: Real, dp: Real, A: Real): Real {
+  return computePermeability(epsilon, dp, A);
 }
 
 export function opPenalize(eta: Real, dt: Real): void {

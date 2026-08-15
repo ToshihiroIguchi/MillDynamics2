@@ -7,6 +7,8 @@ import { advectScalar, advectVelocity } from './advect';
 import { diffuseVelocity } from './diffuse';
 import { penalizeVelocity } from './penalize';
 import { updateMillSolidMask, updateCylinderSolidMask } from './sdf';
+import { updateBedMask, solveChordOffset } from './bed';
+import { applyPorousDrag, computePermeability } from './porous';
 import { computeShellTorque, computeCylinderDrag } from './diagnostics';
 
 export class Solver {
@@ -55,6 +57,16 @@ export class Solver {
   alphaLifter: Real = 0.0;
   cylRadius: Real = 0.0;
 
+  // Porous bed parameters
+  fillJ: Real = 0.0;
+  thetaRepose: Real = 0.6981317007977318; // 40 degrees
+  kSlip: Real = 0.85;
+  epsilon: Real = 0.40;
+  dp: Real = 0.002;
+  A_ergun: Real = 150.0;
+  B_ergun: Real = 1.75;
+  C_gamma: Real = 1.0;
+
   // Simulation time
   time: Real = 0.0;
   lastDt: Real = 0.0;
@@ -81,10 +93,13 @@ export class Solver {
   muN: Float64Array = new Float64Array(0);
   sNode: Float64Array = new Float64Array(0);
 
-  // Solid geometry fields
+  // Solid geometry & Bed fields
   chi: Float64Array = new Float64Array(0);
   uSolid: Float64Array = new Float64Array(0);
   vSolid: Float64Array = new Float64Array(0);
+  chiBed: Float64Array = new Float64Array(0);
+  uMedia: Float64Array = new Float64Array(0);
+  vMedia: Float64Array = new Float64Array(0);
 
   // Multigrid solver instance
   mg: Multigrid = new Multigrid();
@@ -134,6 +149,9 @@ export class Solver {
     this.chi = new Float64Array(nc);
     this.uSolid = new Float64Array(nu);
     this.vSolid = new Float64Array(nv);
+    this.chiBed = new Float64Array(nc);
+    this.uMedia = new Float64Array(nu);
+    this.vMedia = new Float64Array(nv);
 
     for (let i = 0; i < nc; i++) {
       this.muC[i] = this.K;
@@ -232,6 +250,15 @@ export class Solver {
       );
     }
 
+    // 0b. Update porous bed mask
+    if (this.fillJ > 0.0 && this.millRadius > 0.0) {
+      updateBedMask(
+        this.chiBed, this.uMedia, this.vMedia,
+        N, dx, this.cx, this.cy, this.millRadius,
+        this.fillJ, this.thetaRepose, this.omega, this.kSlip
+      );
+    }
+
     // 1. Strain rate & Apparent viscosity
     computeStrainRate(
       this.gammaDot, this.muC, this.muN, this.sNode,
@@ -276,6 +303,16 @@ export class Solver {
           this.v[k] += dt * fy * invRho * (1.0 - chiFace);
         }
       }
+    }
+
+    // 3b. Porous Ergun drag inside the bed (NUMERICS.md §6)
+    if (this.fillJ > 0.0) {
+      applyPorousDrag(
+        this.u, this.v, this.uMedia, this.vMedia, this.chiBed, this.gammaDot,
+        N, dt, this.rho, this.epsilon, this.dp,
+        this.A_ergun, this.B_ergun, this.C_gamma,
+        this.K, this.n, this.tauY, this.m, this.muMin, this.muMax
+      );
     }
 
     // Inflow condition at boundary
@@ -401,5 +438,41 @@ export class Solver {
       this.rho, this.etaPenal,
       U_inf, d_cyl
     );
+  }
+
+  diagBedArea(): Real {
+    let area: Real = 0.0;
+    const nc = this.N * this.N;
+    const dA = this.dx * this.dx;
+    for (let i = 0; i < nc; i++) {
+      area += this.chiBed[i] * dA;
+    }
+    return area;
+  }
+
+  diagBedMeanShearRate(): Real {
+    let sumGd: Real = 0.0;
+    let sumWeight: Real = 0.0;
+    const nc = this.N * this.N;
+    for (let i = 0; i < nc; i++) {
+      const w = this.chiBed[i];
+      sumGd += this.gammaDot[i] * w;
+      sumWeight += w;
+    }
+    return sumWeight > 0.0 ? sumGd / sumWeight : 0.0;
+  }
+
+  diagFreeMeanShearRate(): Real {
+    let sumGd: Real = 0.0;
+    let sumWeight: Real = 0.0;
+    const nc = this.N * this.N;
+    for (let i = 0; i < nc; i++) {
+      const w = (1.0 - this.chi[i]) * (1.0 - this.chiBed[i]);
+      if (w > 0.0) {
+        sumGd += this.gammaDot[i] * w;
+        sumWeight += w;
+      }
+    }
+    return sumWeight > 0.0 ? sumGd / sumWeight : 0.0;
   }
 }
