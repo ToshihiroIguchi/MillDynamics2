@@ -6,6 +6,8 @@ import { Multigrid } from './multigrid';
 import { advectScalar, advectVelocity } from './advect';
 import { diffuseVelocity } from './diffuse';
 import { penalizeVelocity } from './penalize';
+import { updateMillSolidMask, updateCylinderSolidMask } from './sdf';
+import { computeShellTorque, computeCylinderDrag } from './diagnostics';
 
 export class Solver {
   N: i32;
@@ -41,6 +43,18 @@ export class Solver {
   gx: Real = 0.0;
   gy: Real = 0.0;
 
+  // Mill / Obstacle geometry
+  cx: Real = 0.5;
+  cy: Real = 0.5;
+  millRadius: Real = 0.0;
+  omega: Real = 0.0;
+  millAngle: Real = 0.0;
+  nLifters: i32 = 0;
+  hLifter: Real = 0.0;
+  wLifter: Real = 0.0;
+  alphaLifter: Real = 0.0;
+  cylRadius: Real = 0.0;
+
   // Simulation time
   time: Real = 0.0;
   lastDt: Real = 0.0;
@@ -61,18 +75,18 @@ export class Solver {
   tmpU: Float64Array = new Float64Array(0);
   tmpV: Float64Array = new Float64Array(0);
 
-  // Rheology fields
+  // Rheology & Porous fields
   gammaDot: Float64Array = new Float64Array(0);
   muC: Float64Array = new Float64Array(0);
   muN: Float64Array = new Float64Array(0);
   sNode: Float64Array = new Float64Array(0);
 
-  // Penalization & Geometry fields
+  // Solid geometry fields
   chi: Float64Array = new Float64Array(0);
   uSolid: Float64Array = new Float64Array(0);
   vSolid: Float64Array = new Float64Array(0);
 
-  // Multigrid Poisson solver
+  // Multigrid solver instance
   mg: Multigrid = new Multigrid();
 
   constructor() {
@@ -87,8 +101,11 @@ export class Solver {
     this.L = L;
     this.dx = L / <Real>N;
     this.inv = <Real>N / L;
+    this.cx = 0.5 * L;
+    this.cy = 0.5 * L;
     this.time = 0.0;
     this.lastDt = 0.0;
+    this.millAngle = 0.0;
 
     const nc = N * N;
     const nu = (N + 1) * N;
@@ -202,6 +219,19 @@ export class Solver {
     const uWallTop = (this.boundaryMode == MODE_CAVITY || this.boundaryMode == MODE_CHANNEL) ? this.uLid : 0.0;
     const uWallBot = 0.0;
 
+    // 0. Update solid geometry mask if in mill or obstacle mode
+    if (this.boundaryMode == MODE_OBSTACLE) {
+      updateCylinderSolidMask(this.chi, this.uSolid, this.vSolid, N, dx, this.cx, this.cy, this.cylRadius);
+    } else if (this.millRadius > 0.0 && this.boundaryMode != MODE_CHANNEL && this.boundaryMode != MODE_CAVITY) {
+      this.millAngle += dt * this.omega;
+      updateMillSolidMask(
+        this.chi, this.uSolid, this.vSolid, N, dx,
+        this.cx, this.cy, this.millRadius, this.omega,
+        this.nLifters, this.hLifter, this.wLifter, this.alphaLifter,
+        this.millAngle
+      );
+    }
+
     // 1. Strain rate & Apparent viscosity
     computeStrainRate(
       this.gammaDot, this.muC, this.muN, this.sNode,
@@ -223,20 +253,39 @@ export class Solver {
     for (let k = 0; k < (N + 1) * N; k++) this.u[k] = this.uStar[k];
     for (let k = 0; k < N * (N + 1); k++) this.v[k] = this.vStar[k];
 
-    // 3. Body forces & Gravity (scaled by (1 - chi))
+    // 3. Body forces & Gravity (scaled by (1 - chiFace)) (KERNEL_REFERENCE.md §10)
     const fx = this.bodyFx + this.gx;
     const fy = this.bodyFy + this.gy;
     if (fx != 0.0 || fy != 0.0) {
       const invRho = 1.0 / this.rho;
-      for (let k = 0; k < (N + 1) * N; k++) {
-        this.u[k] += dt * fx * invRho;
+      for (let j = 0; j < N; j++) {
+        for (let i = 0; i <= N; i++) {
+          const k = idxU(N, i, j);
+          const cL = i > 0 ? idxC(N, i - 1, j) : idxC(N, 0, j);
+          const cR = i < N ? idxC(N, i,     j) : idxC(N, N - 1, j);
+          const chiFace = 0.5 * (this.chi[cL] + this.chi[cR]);
+          this.u[k] += dt * fx * invRho * (1.0 - chiFace);
+        }
       }
-      for (let k = 0; k < N * (N + 1); k++) {
-        this.v[k] += dt * fy * invRho;
+      for (let j = 0; j <= N; j++) {
+        for (let i = 0; i < N; i++) {
+          const k = idxV(N, i, j);
+          const cB = j > 0 ? idxC(N, i, j - 1) : idxC(N, i, 0);
+          const cT = j < N ? idxC(N, i, j    ) : idxC(N, i, N - 1);
+          const chiFace = 0.5 * (this.chi[cB] + this.chi[cT]);
+          this.v[k] += dt * fy * invRho * (1.0 - chiFace);
+        }
       }
     }
 
-    // 4. Diffusion (implicit TDMA / damped Jacobi)
+    // Inflow condition at boundary
+    if (this.boundaryMode == MODE_INFLOW || this.boundaryMode == MODE_OBSTACLE) {
+      for (let j = 0; j < N; j++) {
+        this.u[idxU(N, 0, j)] = this.uInflow;
+      }
+    }
+
+    // 4. Diffusion (implicit damped Jacobi)
     diffuseVelocity(
       this.u, this.v, this.rhsU, this.rhsV, this.tmpU, this.tmpV,
       this.muC, this.muN,
@@ -255,7 +304,7 @@ export class Solver {
       b0[k] = this.div[k] * rhoInvDt;
     }
 
-    const skipMean = (this.boundaryMode == MODE_INFLOW) ? 1 : 0;
+    const skipMean = (this.boundaryMode == MODE_INFLOW || this.boundaryMode == MODE_OBSTACLE) ? 1 : 0;
     this.mg.solve(skipMean != 0);
 
     const phi0 = this.mg.phi[0];
@@ -335,5 +384,22 @@ export class Solver {
       }
     }
     return <Real>yielded / <Real>nc;
+  }
+
+  diagTorque(): Real {
+    return computeShellTorque(
+      this.u, this.v, this.chi,
+      this.N, this.dx, this.cx, this.cy,
+      this.omega, this.rho, this.etaPenal
+    );
+  }
+
+  diagCylinderDrag(U_inf: Real, d_cyl: Real): Real {
+    return computeCylinderDrag(
+      this.u, this.v, this.chi,
+      this.N, this.dx,
+      this.rho, this.etaPenal,
+      U_inf, d_cyl
+    );
   }
 }

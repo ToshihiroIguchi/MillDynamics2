@@ -7,6 +7,7 @@ import { Multigrid, applyPoisson, subtractMean, zero, l2Norm } from './multigrid
 import { advectScalar, advectVelocity } from './advect';
 import { computeViscousDivergence, diffuseVelocity } from './diffuse';
 import { penalizeVelocity } from './penalize';
+import { updateMillSolidMask, updateCylinderSolidMask, updateTaylorCouetteSolidMask } from './sdf';
 import { Solver } from './solver';
 
 export function add(a: f64, b: f64): f64 {
@@ -51,6 +52,19 @@ export function setGravity(gx: Real, gy: Real): void {
 
 export function setInflow(U: Real): void {
   g_solver.uInflow = U;
+}
+
+export function setMillGeometry(R: Real, omega: Real, nLifters: i32, hLifter: Real, wLifter: Real, alphaLifter: Real): void {
+  g_solver.millRadius = R;
+  g_solver.omega = omega;
+  g_solver.nLifters = nLifters;
+  g_solver.hLifter = hLifter;
+  g_solver.wLifter = wLifter;
+  g_solver.alphaLifter = alphaLifter;
+}
+
+export function setCylinderGeometry(R: Real): void {
+  g_solver.cylRadius = R;
 }
 
 export function setFixedTimeStep(dt: Real): void {
@@ -101,11 +115,15 @@ export function ptrGammaDot(): usize { return g_solver.gammaDot.dataStart; }
 export function ptrMu(): usize { return g_solver.muC.dataStart; }
 export function ptrMuN(): usize { return g_solver.muN.dataStart; }
 export function ptrChi(): usize { return g_solver.chi.dataStart; }
+export function ptrUSolid(): usize { return g_solver.uSolid.dataStart; }
+export function ptrVSolid(): usize { return g_solver.vSolid.dataStart; }
 
 export function diagMaxDiv(): Real { return g_solver.diagMaxDiv(); }
 export function diagKineticEnergy(): Real { return g_solver.diagKineticEnergy(); }
 export function diagMaxVel(): Real { return g_solver.diagMaxVel(); }
 export function diagYieldedFraction(): Real { return g_solver.diagYieldedFraction(); }
+export function diagTorque(): Real { return g_solver.diagTorque(); }
+export function diagCylinderDrag(U_inf: Real, d_cyl: Real): Real { return g_solver.diagCylinderDrag(U_inf, d_cyl); }
 
 // --- Operator Unit Testing Flat Buffers & Wrappers ---
 let g_N: i32 = 0;
@@ -127,6 +145,10 @@ let g_gd: Float64Array = new Float64Array(0);
 let g_muC: Float64Array = new Float64Array(0);
 let g_muN: Float64Array = new Float64Array(0);
 let g_sNode: Float64Array = new Float64Array(0);
+
+let g_chi: Float64Array = new Float64Array(0);
+let g_uSolid: Float64Array = new Float64Array(0);
+let g_vSolid: Float64Array = new Float64Array(0);
 
 let g_scalarSrc: Float64Array = new Float64Array(0);
 let g_scalarDst: Float64Array = new Float64Array(0);
@@ -160,6 +182,10 @@ export function initTestGrid(N: i32, L: Real, periodic: i32): void {
   g_muN = new Float64Array(nn);
   g_sNode = new Float64Array(nn);
 
+  g_chi = new Float64Array(nc);
+  g_uSolid = new Float64Array(nu);
+  g_vSolid = new Float64Array(nv);
+
   g_scalarSrc = new Float64Array(nc);
   g_scalarDst = new Float64Array(nc);
   g_scalarHat = new Float64Array(nc);
@@ -177,6 +203,9 @@ export function ptrTestGammaDot(): usize { return g_gd.dataStart; }
 export function ptrTestMu(): usize { return g_muC.dataStart; }
 export function ptrTestMuC(): usize { return g_muC.dataStart; }
 export function ptrTestMuN(): usize { return g_muN.dataStart; }
+export function ptrTestChi(): usize { return g_chi.dataStart; }
+export function ptrTestUSolid(): usize { return g_uSolid.dataStart; }
+export function ptrTestVSolid(): usize { return g_vSolid.dataStart; }
 export function ptrScalarSrc(): usize { return g_scalarSrc.dataStart; }
 export function ptrScalarDst(): usize { return g_scalarDst.dataStart; }
 
@@ -210,13 +239,13 @@ export function initMG(N: i32, L: Real, maxCycles: i32, tol: Real): void {
   g_mg.init(N, L, maxCycles, tol, 0);
 }
 
-export function ptrMGPhi(): usize { return g_mg.phi[0].dataStart; }
-export function ptrMGB(): usize { return g_mg.b[0].dataStart; }
-export function ptrMGRes(): usize { return g_mg.r[0].dataStart; }
-
-export function solveMG(skipMean: i32): i32 {
-  return g_mg.solve(skipMean != 0);
+export function solveMG(skipMean: i32): void {
+  g_mg.solve(skipMean != 0);
 }
+
+export function ptrMGB(): usize { return g_mg.b[0].dataStart; }
+export function ptrMGPhi(): usize { return g_mg.phi[0].dataStart; }
+export function ptrMGR(): usize { return g_mg.r[0].dataStart; }
 
 export function opApplyPoisson(outPtr: usize, inPtr: usize, N: i32, invH2: Real): void {
   const out = changetype<Float64Array>(outPtr);
@@ -254,5 +283,36 @@ export function opViscousDivergence(mode: i32): void {
   computeViscousDivergence(
     g_uDst, g_vDst, g_u, g_v, g_muC, g_muN,
     g_N, g_dx, g_inv, mode, 0.0, 0.0, 0.0, 0.0
+  );
+}
+
+export function opUpdateMillSolidMask(
+  R: Real, omega: Real, nLifters: i32, hLifter: Real, wLifter: Real, alphaLifter: Real, currentAngle: Real
+): void {
+  updateMillSolidMask(
+    g_chi, g_uSolid, g_vSolid, g_N, g_dx,
+    0.5 * g_L, 0.5 * g_L, R, omega,
+    nLifters, hLifter, wLifter, alphaLifter, currentAngle
+  );
+}
+
+export function opUpdateCylinderSolidMask(R: Real): void {
+  updateCylinderSolidMask(
+    g_chi, g_uSolid, g_vSolid, g_N, g_dx,
+    0.5 * g_L, 0.5 * g_L, R
+  );
+}
+
+export function opUpdateTaylorCouetteSolidMask(R_i: Real, R_o: Real, omega_i: Real, omega_o: Real): void {
+  updateTaylorCouetteSolidMask(
+    g_chi, g_uSolid, g_vSolid, g_N, g_dx,
+    0.5 * g_L, 0.5 * g_L, R_i, R_o, omega_i, omega_o
+  );
+}
+
+export function opPenalize(eta: Real, dt: Real): void {
+  penalizeVelocity(
+    g_u, g_v, g_uSolid, g_vSolid, g_chi,
+    g_N, dt, eta
   );
 }
