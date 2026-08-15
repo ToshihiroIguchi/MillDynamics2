@@ -1,0 +1,66 @@
+# VALIDATION — Measured Results
+
+> **To be filled in by Gemini as each phase completes.** Every entry must carry a
+> measured value, the tolerance from `EXPERIMENT_PLAN.md`, and a verdict. An
+> empty section means the case has not been run — do not mark it PASS on the
+> assumption that it would.
+
+---
+
+## Environment
+
+| Item | Value |
+| --- | --- |
+| Date | |
+| Machine / CPU | |
+| Browser + version | |
+| Node version | |
+| AssemblyScript version | |
+| Build flags | |
+
+---
+
+## Part 1 — Verification
+
+### V1 — Lid-driven cavity (Ghia et al. 1982)
+### V2 — Power-law Poiseuille
+### V3 — Bingham / Herschel–Bulkley plug flow
+### V4 — Taylor–Green vortex decay
+### V5 — Discrete incompressibility
+### V6 — Flow past a cylinder (Dennis & Chang 1970)
+### V7 — Taylor–Couette torque
+### V8 — Disc-array permeability (Gebart 1992)
+### V9 — Robustness
+### V10 — Performance
+
+| N | Δx [mm] | FPS | advect [ms] | diffuse [ms] | drag+penal [ms] | multigrid [ms] | diag [ms] | render [ms] |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 128 | 8.0 | | | | | | | |
+| 256 | 4.0 | | | | | | | |
+| 512 | 2.0 | | | | | | | |
+
+---
+
+## Part 2 — Experiments
+
+### E1 — Rheology sweep
+### E2 — Mill speed sweep
+### E3 — Fill level
+### E4 — Media size
+### E5 — Grid convergence
+### E6 — RVE closure calibration
+
+Measured 2D closure constants (compare against the 3D Ergun values 150 / 1.75,
+which are **not** expected to hold in 2D):
+
+| 1−ε | Packing | A_2D | B_2D | C_γ | R² |
+| --- | --- | --- | --- | --- | --- |
+
+### E7 — Regularization sensitivity
+
+---
+
+## Deviations from spec
+
+| Item | Specified | Measured / implemented | Diagnosis |
+| --- | --- | --- | --- |

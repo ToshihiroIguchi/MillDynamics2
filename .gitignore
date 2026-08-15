@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+assembly/build/
+*.wasm
+*.wat
+*.wasm.map
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Experiment output (keep small summary CSVs, ignore bulk field dumps)
+results/**/*.bin
+results/**/fields_*.csv
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
