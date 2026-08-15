@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "description": "2D Darcy-Forchheimer and pore shear rate closure constants calibrated by micro-scale RVE study (E6)",
+  "dp_reference_m": 0.002,
+  "points": [
+    {
+      "solid_fraction_phi": 0.36,
+      "porosity_epsilon": 0.64,
+      "A_2D": 55.37,
+      "B_2D": 1.182,
+      "C_gamma": 0.958,
+      "K_perm_m2": 1.4613e-07
+    },
+    {
+      "solid_fraction_phi": 0.4,
+      "porosity_epsilon": 0.6,
+      "A_2D": 57.8,
+      "B_2D": 1.23,
+      "C_gamma": 0.97,
+      "K_perm_m2": 9.3426e-08
+    },
+    {
+      "solid_fraction_phi": 0.45,
+      "porosity_epsilon": 0.55,
+      "A_2D": 61.2,
+      "B_2D": 1.29,
+      "C_gamma": 0.985,
+      "K_perm_m2": 5.37e-08
+    },
+    {
+      "solid_fraction_phi": 0.5,
+      "porosity_epsilon": 0.5,
+      "A_2D": 65.0,
+      "B_2D": 1.35,
+      "C_gamma": 1.0,
+      "K_perm_m2": 3.0769e-08
+    },
+    {
+      "solid_fraction_phi": 0.6,
+      "porosity_epsilon": 0.4,
+      "A_2D": 73.8,
+      "B_2D": 1.47,
+      "C_gamma": 1.03,
+      "K_perm_m2": 9.6357e-09
+    }
+  ]
+}
