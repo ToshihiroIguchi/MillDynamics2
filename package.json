@@ -6,11 +6,11 @@
     "asbuild:debug": "asc assembly/index.ts --target debug",
     "asbuild": "asc assembly/index.ts --target release",
     "dev": "npm run asbuild && vite",
-    "build": "npm run asbuild && tsc --noEmit && vite build",
+    "build": "npm run asbuild && tsc --noEmit && vite build && node -e \"const fs=require('fs'); fs.copyFileSync('assembly/build/mill.wasm', 'dist/mill.wasm');\"",
     "preview": "vite preview --port 4173",
     "test": "npm run asbuild:debug && vitest run",
     "smoke": "node scripts/smoke.mjs",
-    "experiments": "node scripts/run_experiments.mjs"
+    "experiments": "npx tsx scripts/run_experiments.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.50.0",

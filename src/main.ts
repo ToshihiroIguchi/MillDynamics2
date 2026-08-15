@@ -36,10 +36,25 @@ class App {
 
   async init(): Promise<void> {
     // 1. Load WebAssembly module
-    const wasmResponse = await fetch(new URL('../build/debug.wasm', import.meta.url).href).catch(() =>
-      fetch(new URL('../build/release.wasm', import.meta.url).href)
-    );
-    const wasmBytes = await wasmResponse.arrayBuffer();
+    const wasmUrls = [
+      './mill.wasm',
+      './build/mill.wasm',
+      './build/release.wasm',
+      new URL('../assembly/build/mill.wasm', import.meta.url).href,
+      new URL('../assembly/build/mill.debug.wasm', import.meta.url).href
+    ];
+    let wasmBytes: ArrayBuffer | null = null;
+    for (const u of wasmUrls) {
+      try {
+        const resp = await fetch(u);
+        if (resp.ok) {
+          wasmBytes = await resp.arrayBuffer();
+          break;
+        }
+      } catch {}
+    }
+    if (!wasmBytes) throw new Error('Failed to load WASM binary');
+
     const wasmModule = await WebAssembly.instantiate(wasmBytes, {
       env: {
         abort(msg: number, file: number, line: number, col: number) {
@@ -49,6 +64,7 @@ class App {
       }
     });
     this.wasm = wasmModule.instance.exports;
+    (window as any).__MILL_APP__ = this;
 
     // 2. Check URL permalink hash
     const hashCfg = decodePermalink(window.location.hash);
