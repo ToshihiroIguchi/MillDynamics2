@@ -3,6 +3,7 @@ import { Real } from './types';
 import { calcDivergence, applyGradient } from './grid';
 import { muApp } from './rheology';
 import { computeStrainRate } from './strain';
+import { Multigrid, applyPoisson, subtractMean, zero, l2Norm } from './multigrid';
 
 export function add(a: f64, b: f64): f64 {
   return a + b;
@@ -21,6 +22,8 @@ let g_gd: Float64Array = new Float64Array(0);
 let g_muC: Float64Array = new Float64Array(0);
 let g_muN: Float64Array = new Float64Array(0);
 let g_sNode: Float64Array = new Float64Array(0);
+
+const g_mg: Multigrid = new Multigrid();
 
 export function initTestGrid(N: i32, L: Real, periodic: i32): void {
   g_N = N;
@@ -41,6 +44,8 @@ export function initTestGrid(N: i32, L: Real, periodic: i32): void {
   g_muC = new Float64Array(nc);
   g_muN = new Float64Array(nn);
   g_sNode = new Float64Array(nn);
+
+  g_mg.init(N, L, 10, 1e-6);
 }
 
 export function ptrU(): usize { return g_u.dataStart; }
@@ -73,4 +78,35 @@ export function opStrainRate(
 
 export function testMuApp(gd: Real, K: Real, n: Real, tauY: Real, m: Real, muMin: Real, muMax: Real): Real {
   return muApp(gd, K, n, tauY, m, muMin, muMax);
+}
+
+// Multigrid test exports
+export function initMG(N: i32, L: Real, maxCycles: i32, tol: Real): void {
+  g_N = N;
+  g_L = L;
+  g_mg.init(N, L, maxCycles, tol);
+}
+
+export function ptrMGPhi(): usize { return g_mg.phi[0].dataStart; }
+export function ptrMGB(): usize { return g_mg.b[0].dataStart; }
+export function ptrMGRes(): usize { return g_mg.r[0].dataStart; }
+
+export function solveMG(skipMean: i32): i32 {
+  return g_mg.solve(skipMean != 0);
+}
+
+export function opApplyPoisson(outPtr: usize, inPtr: usize, N: i32, invH2: Real): void {
+  const out = changetype<Float64Array>(outPtr);
+  const inArr = changetype<Float64Array>(inPtr);
+  applyPoisson(out, inArr, N, invH2);
+}
+
+export function opL2(ptr: usize, len: i32): Real {
+  const arr = changetype<Float64Array>(ptr);
+  return l2Norm(arr, len);
+}
+
+export function opSubMean(ptr: usize, len: i32): void {
+  const arr = changetype<Float64Array>(ptr);
+  subtractMean(arr, len);
 }
