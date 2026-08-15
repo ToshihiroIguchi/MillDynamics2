@@ -144,6 +144,35 @@ export function sampleU(u: Float64Array, N: i32, inv: Real, x: Real, y: Real): R
 `sampleV` is the mirror image: `gx = x*inv − 0.5`, `gy = y*inv`, clamp
 `i0 ≤ N−2`, `j0 ≤ N−1`.
 
+### 2b. Ghost values at walls — do not just write zero
+
+`u(i,j)` sits at `y = (j+0.5)Δx`, so the wall at `y = 0` lies **half a cell
+below** the first `u` row. A no-slip wall therefore needs a *mirrored* ghost, not
+a zero:
+
+```ts
+// tangential velocity below a stationary no-slip wall
+uGhost = -u[idxU(N, i, 0)];              // gives u = 0 exactly at y = 0
+// moving wall (cavity lid, Couette surface) at tangential speed Uw
+uGhost = 2.0 * Uw - u[idxU(N, i, N - 1)];
+// free-slip / symmetry
+uGhost = +u[idxU(N, i, 0)];
+// periodic
+uGhost = u[idxU(N, i, N - 1)];
+```
+
+Writing `0.0` instead of `−u[...]` places the effective wall at `y = −0.5Δx`:
+the channel is silently half a cell too wide, the scheme drops to first order at
+the boundary, and V2 fails its 1 % tolerance for a reason that looks like a
+solver bug rather than a boundary bug. The **normal** component (`v` at `y = 0`)
+is genuinely zero and is simply set, not mirrored — the asymmetry between the two
+components is deliberate.
+
+Every stencil that reaches outside the array — the diffusion sweep (§5), the node
+strain rate (§4), and the advection clamp — must use these ghosts. Put them in
+one helper per field and call it everywhere; hand-inlining the branch in three
+places is how two of them end up different.
+
 ---
 
 ## 3. Rheology, with the small-γ̇ guard
@@ -185,10 +214,11 @@ export function strainRate(/* ... */): void {
   // dudy + dvdx at nodes (i,j) in [0,N] x [0,N]
   for (let j = 0; j <= N; j++) {
     for (let i = 0; i <= N; i++) {
-      const uUp = (j < N)     ? u[idxU(N, i, j)]     : 0.0;   // wall BC
-      const uDn = (j > 0)     ? u[idxU(N, i, j - 1)] : 0.0;
-      const vRt = (i < N)     ? v[idxV(N, i, j)]     : 0.0;
-      const vLf = (i > 0)     ? v[idxV(N, i - 1, j)] : 0.0;
+      // ghostU / ghostV apply the rules of §2b; never inline `0.0` here
+      const uUp = (j < N) ? u[idxU(N, i, j)]     : ghostU(u, N, i, N - 1, +1);
+      const uDn = (j > 0) ? u[idxU(N, i, j - 1)] : ghostU(u, N, i, 0,     -1);
+      const vRt = (i < N) ? v[idxV(N, i, j)]     : ghostV(v, N, N - 1, j, +1);
+      const vLf = (i > 0) ? v[idxV(N, i - 1, j)] : ghostV(v, N, 0,     j, -1);
       sNode[idxN(N, i, j)] = (uUp - uDn) * inv + (vRt - vLf) * inv;
     }
   }
@@ -256,8 +286,9 @@ export function diffuseU(nIter: i32, omegaDamp: Real, dt: Real, rho: Real): void
 
         const uR = u[idxU(N, i + 1, j)];
         const uL = u[idxU(N, i - 1, j)];
-        const uT = (j < N - 1) ? u[idxU(N, i, j + 1)] : 0.0;
-        const uB = (j > 0)     ? u[idxU(N, i, j - 1)] : 0.0;
+        // Mirrored ghosts at walls -- see §2b. NOT 0.0.
+        const uT = (j < N - 1) ? u[idxU(N, i, j + 1)] : (2.0 * uWallTop - u[k]);
+        const uB = (j > 0)     ? u[idxU(N, i, j - 1)] : (2.0 * uWallBot - u[k]);
 
         const off  = a * (2.0 * mR * uR + 2.0 * mL * uL + mT * uT + mB * uB);
         const diag = 1.0 + a * (2.0 * mR + 2.0 * mL + mT + mB);

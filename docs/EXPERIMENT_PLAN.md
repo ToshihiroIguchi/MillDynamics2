@@ -1,7 +1,12 @@
 # EXPERIMENT PLAN
 
-Two parts:
+Three parts:
 
+- **U1–U12 — Operator tests.** Is each individual kernel correct, *in
+  isolation*? These run in milliseconds, need no physics, and most compare
+  against machine precision. **They exist so that a failure tells you which
+  module is broken.** Write the U test for a kernel in the same commit as the
+  kernel — never after.
 - **V1–V10 — Verification.** Does the solver solve the equations correctly?
   Every case has an analytical solution or published benchmark data, and a
   numeric tolerance. These are automated Vitest tests and they gate the CI build.
@@ -11,6 +16,54 @@ Two parts:
 
 Results go in `docs/VALIDATION.md` as **measured value / tolerance / verdict**.
 An experiment reported without a number is not reported.
+
+---
+
+# Part 0 — Operator tests (fast, isolating)
+
+Every V case exercises six modules at once, so a V failure tells you almost
+nothing about *where* the bug is. These tests exercise one kernel each. If a V
+case fails while all U tests pass, the bug is in the coupling; if a U test fails,
+you know the file.
+
+Most of these are exact to machine precision because they exploit an algebraic
+property rather than a numerical solution. **Exact tests are worth far more than
+approximate ones** — there is no tolerance to argue with.
+
+| # | What | Setup | Expected | Tolerance |
+| --- | --- | --- | --- | --- |
+| **U1** | Divergence operator | `u = (sin kx·cos ky, −cos kx·sin ky)` (divergence-free) | `∇·u = 0` | < 1e-12 |
+| **U2** | Divergence, 2nd order | `u = (x², 0)` ⇒ `∇·u = 2x` | order ≥ 1.9 over 64/128/256 | — |
+| **U3** | Gradient / divergence adjointness | random `p`, random `u` | `⟨∇p, u⟩ = −⟨p, ∇·u⟩` | < 1e-12 |
+| **U4** | Poisson, manufactured solution | `φ = cos(mπx/L)·cos(mπy/L)`, `b = ∇²φ = −2(mπ/L)²φ` | recovers `φ` after mean removal; order ≥ 1.9 | 1 % at 128² |
+| **U5** | Poisson null space | `b = 0`, random initial `φ` | converges to a constant; `‖∇φ‖ → 0` | < 1e-10 |
+| **U6** | Poisson operator symmetry | random `a`, `b` | `⟨a, Lb⟩ = ⟨b, La⟩` | < 1e-12 |
+| **U7** | Projection idempotence | random `u`; project twice | `‖∇·u‖ → 0` after the first; the second changes nothing | < 1e-10 |
+| **U8** | Advection, uniform translation | Gaussian blob, uniform `U`, periodic, one full traverse | position error < 0.5 Δx; **report peak retention** | see below |
+| **U9** | Advection, solid-body rotation | blob rotated one full revolution about the centre | shape recovered; **report peak retention** | see below |
+| **U10** | Strain rate, exact | `u = (y, 0)` ⇒ `γ̇ = 1`; `u = (x, −y)` ⇒ `γ̇ = 2` | exact | < 1e-12 |
+| **U11** | Viscous operator null space | uniform translation `u = (c₁, c₂)`; and rigid rotation `u = ω(−y, x)` | `∇·(2μD) = 0` in both cases, for **variable** `μ` | < 1e-10 |
+| **U12** | Penalization, exact relaxation | fully solid cell, `u_wall = 0`, no other force, `n` steps | `u = u₀·(1 + Δt/η)^(−n)` | < 1e-12 |
+
+Notes on the two that have no absolute threshold:
+
+- **U8/U9 peak retention**: there is no universally correct value, so do not
+  invent one. Instead run *both* schemes on the same problem and report the
+  ratio: MacCormack must retain substantially more peak amplitude than
+  first-order semi-Lagrangian. If the two are within a few percent of each other,
+  the MacCormack correction is not actually being applied — which is precisely
+  the bug that later makes V1 fail at Re = 1000 while passing at Re = 100.
+  This is why the first-order scheme is kept as a selectable option.
+
+- **U11 is the highest-value test in this table.** A rigid-body motion produces
+  zero rate of strain, so the variable-viscosity stress divergence must vanish
+  identically — regardless of how `μ` varies. Almost every stencil error in
+  `diffuse.ts` (wrong node/centre placement, a missing cross term, a sign slip)
+  breaks it, and it costs nothing to check.
+
+- **U3 and U6** catch boundary-stencil errors that interior-point tests miss,
+  including the `cnt` vs. hard-coded `4.0` mistake flagged in
+  `KERNEL_REFERENCE.md` §6.
 
 ---
 

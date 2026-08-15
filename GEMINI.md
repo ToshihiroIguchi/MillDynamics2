@@ -23,13 +23,28 @@ specification; your job is to build it, test it, and prove it works.
   autonomously.
 - Complete all code generation, file creation, automated tests, builds and
   verifications end-to-end in a single continuous workflow.
-- Work **phase by phase** through `docs/IMPLEMENTATION_PLAN.md`. A phase is
-  finished only when its "Definition of Done" checks all pass. Commit at the end
-  of each phase with the message prefix `phase-N:`.
+- Work **row by row** through `docs/CHECKLIST.md`. A row is finished only when
+  its named tests pass. Commit after every row (`phase-1b: multigrid`).
+- **Never start a row before the previous row's test passes.** This is what makes
+  a failure diagnosable: when a test fails, the bug is in the code you just
+  wrote, because everything before it is already verified. Writing three
+  increments and then debugging them together is how this project fails.
+- **Print a one-paragraph checkpoint at each phase boundary** — which rows
+  passed, the measured numbers, anything you deviated on. This is a report, not a
+  question: do not wait for a reply, keep going. It exists so a problem is
+  visible after one phase instead of after eight.
 - When implementation and verification are complete, commit and push to GitHub.
 - Report only the final summary of changes and execution results.
 
 ## Where to start
+
+**Open `docs/CHECKLIST.md` and work down it.** It is the ordered worklist: each
+row names one increment, the few sections to read immediately before writing it,
+and the test that must pass immediately after. Do not try to hold the whole
+specification in your head — it is ~3000 lines and you do not need most of it at
+any given moment.
+
+The other documents, for when a row sends you to them:
 
 1. Read `docs/PHYSICS.md` (what is being solved and why).
 2. Read `docs/NUMERICS.md` (how it is discretised).
@@ -64,6 +79,10 @@ When something looks ambiguous, the answer is almost always already in
   specified by `docs/PARAMETERS.md`. The panel UI, the CSV metadata block, the
   URL permalink and the headless CLI are all generated from that one schema —
   do not maintain parallel lists.
+- **Write each operator test (U1–U12) in the same commit as the kernel it
+  tests**, never afterwards. They are exact to machine precision and take
+  milliseconds; their whole purpose is to tell you *which module* is broken,
+  which they cannot do if they arrive after the bug.
 - **Do not weaken a test to make it pass.** If a tolerance in
   `docs/EXPERIMENT_PLAN.md` cannot be met, fix the solver. If after genuine
   effort it still cannot be met, record the measured value, the tolerance, and

@@ -48,6 +48,7 @@ In short: **no free surface** (single phase ⇒ flooded mill), **2D only**, and
 
 | File | Contents |
 | --- | --- |
+| [`docs/CHECKLIST.md`](docs/CHECKLIST.md) | Ordered worklist — the entry point for implementation |
 | [`docs/PHYSICS.md`](docs/PHYSICS.md) | Equations, closures, assumptions |
 | [`docs/NUMERICS.md`](docs/NUMERICS.md) | Discretisation and solver algorithms |
 | [`docs/PARAMETERS.md`](docs/PARAMETERS.md) | Every adjustable parameter, with defaults and ranges |

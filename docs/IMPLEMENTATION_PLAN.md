@@ -4,6 +4,10 @@ Nine phases. Each phase lists what to build, the exact commands to run, and a
 **Definition of Done (DoD)** that must fully pass before moving on. Commit at the
 end of each phase with the prefix `phase-N:`.
 
+> **`CHECKLIST.md` is the entry point, not this file.** It breaks these phases
+> into the increments you actually implement one at a time, and names the test
+> that gates each one. Use this document for the detail behind a row.
+
 Read `PHYSICS.md`, `NUMERICS.md` and `PARAMETERS.md` first — they are the
 specification; this document is the schedule. `KERNEL_REFERENCE.md` gives
 working code for the parts that are easy to get wrong, and `TESTING.md` gives the
@@ -70,6 +74,7 @@ MillDynamics2/
 │   └── fit_closure.py             # E6: fit A_2D, B_2D, C_γ → closure_table.json
 ├── results/                       # experiment CSVs (git-ignored above 1 MB)
 └── docs/
+    ├── CHECKLIST.md                # ordered worklist, the entry point
     ├── PHYSICS.md  NUMERICS.md  PARAMETERS.md
     ├── KERNEL_REFERENCE.md  TESTING.md
     ├── IMPLEMENTATION_PLAN.md  EXPERIMENT_PLAN.md
@@ -157,15 +162,62 @@ served over HTTP** — opening it via `file://` fails on CORS. `npm run preview`
 
 ## Phase 1 — MAC grid + Newtonian projection solver
 
-Build `types.ts`, `grid.ts`, `advect.ts`, `multigrid.ts`, and a first `solver.ts`
-with **constant viscosity** and no geometry. Periodicity must already be a flag
-in `grid.ts` (Taylor–Green needs it in this phase).
+> **Build this phase in five increments, in this order, and verify each one
+> before starting the next.** Written as a single push it is roughly 1500 lines
+> that all fail at once with no way to localise the cause. Each increment below
+> ends in a test that isolates exactly what was just written.
 
-Key points from `NUMERICS.md`: staggered layout §1, projection ordering §2,
-MacCormack with clamping §3, V-cycle §8 including the **mean-zero
-right-hand side** for the pure-Neumann case.
+### Phase 1a — Grid, operators, and their unit tests
 
-**Exports added**
+`types.ts`, `grid.ts`, and the divergence/gradient operators. No time stepping,
+no fluid. Follow `KERNEL_REFERENCE.md` §1–2 for the index layout and the
+staggered cross-sampling.
+
+Stop and pass **U1, U2, U3, U10** before writing anything else. U3 (the
+gradient/divergence adjointness identity) is exact to machine precision and
+catches almost every index-range error; U10 likewise for the strain rate.
+
+### Phase 1b — Multigrid Poisson solver, standalone
+
+`multigrid.ts` only. No fluid — feed it a manufactured right-hand side directly.
+Follow `KERNEL_REFERENCE.md` §6, including both mandatory `subtractMean` calls
+and the `cnt` (not `4.0`) Neumann diagonal.
+
+Stop and pass **U4, U5, U6**. Record the residual history of one solve and paste
+it into `VALIDATION.md`. A Poisson solver that is wrong here will corrupt
+everything downstream while producing pictures that still look like fluid.
+
+### Phase 1c — Advection, standalone
+
+`advect.ts` only, driving a passive scalar with a prescribed velocity field.
+MacCormack with the clamp, per `KERNEL_REFERENCE.md` §2 and `NUMERICS.md` §3.
+Keep first-order semi-Lagrangian as a selectable option — U8/U9 need both.
+
+Stop and pass **U8, U9**, and report the peak-retention ratio between the two
+schemes.
+
+### Phase 1d — Couple into a projection solver
+
+`solver.ts`: constant viscosity, explicit diffusion (implicit comes in Phase 2),
+projection ordering per `NUMERICS.md` §2. No geometry yet.
+
+Stop and pass **U7, U11, U12** and **V4** (Taylor–Green) and **V5**
+(divergence over 1000 steps).
+
+### Phase 1e — Boundary modes
+
+The six modes of `TESTING.md` §2, including the mode-4 exception where
+`subtractMean` must be **skipped** because the outflow column makes the Poisson
+problem non-singular.
+
+Stop and pass **V1** (cavity, Re = 100 and 400).
+
+**They are not optional and not deferrable.** V1 needs a driven lid, V2/V3 need a
+periodic channel with a body force, V4 needs full periodicity, V6 needs
+inflow/outflow. Without them the verification suite cannot be written at all, and
+every later phase would rest on an unverified core.
+
+**Exports added (by the end of Phase 1)**
 
 ```
 createSolver(n: i32, L: f64): void
@@ -181,18 +233,8 @@ ptrU(): usize   ptrV(): usize   ptrP(): usize
 diagMaxDiv(): f64   diagKineticEnergy(): f64   diagMaxVel(): f64
 ```
 
-**The boundary modes are not optional and not deferrable.** V1 needs a driven
-lid, V2/V3 need a periodic channel with a body force, V4 needs full periodicity,
-V6 needs inflow/outflow. Without them the verification suite cannot be written at
-all, and every later phase would be built on an unverified core. Implement them
-in Phase 1 alongside the solver, exactly as tabulated in `TESTING.md` §2–3 —
-including the mode-4 exception where `subtractMean` must be **skipped** because
-the outflow column makes the Poisson problem non-singular.
-
-**Verification** (see `EXPERIMENT_PLAN.md` for tolerances): V1 lid-driven cavity
-vs. Ghia et al., V4 Taylor–Green decay, V5 divergence.
-
 **DoD**
+- [ ] U1–U12 all pass (each was written with its own increment above).
 - [ ] V1 passes at Re = 100 and Re = 400 on 128².
 - [ ] V4 shows ≥ 1.8th order spatial convergence and matches the analytical decay
       rate within 2 % over 1 s.

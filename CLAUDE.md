@@ -62,6 +62,7 @@ These were decided with the user and must not be changed without asking:
 
 | File | Contents |
 | --- | --- |
+| `docs/CHECKLIST.md` | **The entry point.** Ordered worklist: one row per increment, what to read before it, what must pass after it |
 | `docs/PHYSICS.md` | Governing equations, closures, modelling assumptions and their justification |
 | `docs/NUMERICS.md` | Discretisation, time integration, solver algorithms, stability limits |
 | `docs/PARAMETERS.md` | **Every runtime-adjustable parameter** with unit, default, range and validity warnings — the single source of truth |

@@ -20,6 +20,32 @@
 
 ---
 
+## Part 0 — Operator tests
+
+| # | What | Measured | Tolerance | Verdict |
+| --- | --- | --- | --- | --- |
+| U1 | Divergence of a divergence-free field | | < 1e-12 | |
+| U2 | Divergence, order of accuracy | | ≥ 1.9 | |
+| U3 | Gradient/divergence adjointness | | < 1e-12 | |
+| U4 | Poisson, manufactured solution | | 1 % at 128², order ≥ 1.9 | |
+| U5 | Poisson null space | | < 1e-10 | |
+| U6 | Poisson operator symmetry | | < 1e-12 | |
+| U7 | Projection idempotence | | < 1e-10 | |
+| U8 | Advection, uniform translation | | < 0.5 Δx | |
+| U9 | Advection, solid-body rotation | | see note | |
+| U10 | Strain rate, exact | | < 1e-12 | |
+| U11 | Viscous operator null space | | < 1e-10 | |
+| U12 | Penalization, exact relaxation | | < 1e-12 | |
+
+Peak retention, MacCormack vs. first-order semi-Lagrangian (U8/U9):
+
+| Test | MacCormack | 1st-order SL | Ratio |
+| --- | --- | --- | --- |
+| U8 uniform translation | | | |
+| U9 solid-body rotation | | | |
+
+---
+
 ## Part 1 — Verification
 
 ### V1 — Lid-driven cavity (Ghia et al. 1982)

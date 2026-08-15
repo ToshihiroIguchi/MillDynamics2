@@ -132,6 +132,96 @@ build once under V10 only.
 
 ---
 
+## 4b. A complete worked test — copy this shape for the other eight
+
+This is V2 end to end. Every other V case follows the same five steps: configure
+the mode, drive it, run to steady state, extract a profile, compare to a closed
+form.
+
+```ts
+// tests/v2_powerlaw_poiseuille.test.ts
+import { describe, it, expect } from 'vitest';
+import { loadSolver } from './helpers/loadWasm';
+
+const MODE_CHANNEL = 3;
+
+// Analytical profile, measured from the channel centreline
+function uExact(yc: number, H: number, G: number, K: number, n: number): number {
+  const p = (n + 1) / n;
+  return (n / (n + 1)) * Math.pow(G / K, 1 / n) * (Math.pow(H, p) - Math.pow(Math.abs(yc), p));
+}
+
+async function runChannel(N: number, n: number, K: number) {
+  const { e, view } = await loadSolver(true);
+  const L = 1.0, H = L / 2, rho = 1.0, G = 1.0;
+
+  e.createSolver(N, L);
+  e.setBoundaryMode(MODE_CHANNEL);       // periodic in x, no-slip at y=0 and y=L
+  e.setFluid(rho, K);
+  e.setRheology(K, n, 0.0, 1000.0, 1e-6, 1e6);   // tau_y = 0 => power law
+  e.setBodyForce(G / rho, 0.0);
+  e.setGravity(0.0, 0.0);
+  e.setFixedTimeStep(0.0);               // adaptive is fine here
+
+  // Run to steady state, not for a fixed number of steps: the relaxation time
+  // scales with n and would otherwise need a different constant per case.
+  let prev = 0, steady = false;
+  for (let it = 0; it < 200_000 && !steady; it++) {
+    e.step(0.0);
+    if (it % 200 === 0) {
+      const ke = e.diagKineticEnergy();
+      if (it > 0 && Math.abs(ke - prev) < 1e-10 * Math.max(ke, 1e-30)) steady = true;
+      prev = ke;
+    }
+  }
+  expect(steady, 'channel flow did not reach steady state').toBe(true);
+
+  // Extract the u profile from a single column (flow is x-independent)
+  const u = view(e.ptrU(), (N + 1) * N);
+  const dx = L / N, i = N >> 1;
+  const num: number[] = [], ana: number[] = [];
+  for (let j = 0; j < N; j++) {
+    const y = (j + 0.5) * dx;
+    num.push(u[i + j * (N + 1)]);
+    ana.push(uExact(y - H, H, G, K, n));
+  }
+  const uMax = Math.max(...ana);
+  const l2 = Math.sqrt(num.reduce((s, v, k) => s + (v - ana[k]) ** 2, 0) / N);
+  return { l2rel: l2 / uMax, uMax };
+}
+
+describe('V2 - power-law Poiseuille flow', () => {
+  for (const n of [0.5, 1.0, 1.5]) {
+    it(`matches the analytical profile at n=${n}`, async () => {
+      const { l2rel } = await runChannel(128, n, 0.5);
+      expect(l2rel).toBeLessThan(0.01);          // 1 %, per EXPERIMENT_PLAN
+    });
+  }
+
+  it('converges at second order', async () => {
+    const e1 = (await runChannel(64,  0.7, 0.5)).l2rel;
+    const e2 = (await runChannel(128, 0.7, 0.5)).l2rel;
+    const e3 = (await runChannel(256, 0.7, 0.5)).l2rel;
+    const order = (Math.log2(e1 / e2) + Math.log2(e2 / e3)) / 2;
+    console.log(`V2 errors: ${e1.toExponential(3)} ${e2.toExponential(3)} ` +
+                `${e3.toExponential(3)}  order=${order.toFixed(2)}`);
+    expect(order).toBeGreaterThan(1.8);
+  });
+});
+```
+
+Three things in there are deliberate and should carry over to every other case:
+
+1. **Run to steady state, never a hard-coded step count.** The relaxation time
+   depends on `n`, `K` and `N`; a fixed count that works for one case silently
+   under-converges another and looks like a discretisation error.
+2. **`console.log` the measured numbers**, not just the assertion. Those printed
+   values are what gets pasted into `VALIDATION.md`; a green tick is not a result.
+3. **Assert that steady state was reached** before comparing anything. Otherwise
+   a non-converging run produces a profile that is merely wrong, with no clue why.
+
+---
+
 ## 5. Python: always inside a virtual environment
 
 Python is used for the closure fitting (`scripts/fit_closure.py`, experiment E6)
