@@ -3,21 +3,71 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="MillDynamics2 — Non-Newtonian Slurry Hydrodynamics & Porous Media Grinding Mill Simulator in WebAssembly">
   <title>MillDynamics2 — Non-Newtonian Slurry Simulation</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, sans-serif;
-      background: #111;
-      color: #eee;
-    }
-  </style>
+  <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
-  <div id="app">
-    <h1>MillDynamics2</h1>
-    <div id="status">Initializing WebAssembly...</div>
+  <div id="app" class="app-layout">
+    <!-- Left: Viewport & Live Visualizations -->
+    <main class="viewport-panel">
+      <header class="viewport-header">
+        <div class="app-title">
+          <h1>MillDynamics2</h1>
+        </div>
+        <div class="field-selectors">
+          <label for="fieldSelect">Field:</label>
+          <select id="fieldSelect" class="select-field">
+            <option value="speed">Velocity Magnitude (|u|)</option>
+            <option value="mu" selected>Apparent Viscosity (μ_app)</option>
+            <option value="gammaDot">Shear Rate (γ̇)</option>
+            <option value="yieldState">Yield State (Yielded / Dead Zone)</option>
+            <option value="p">Pressure (p)</option>
+            <option value="vorticity">Vorticity (ω_z)</option>
+            <option value="chiBed">Bed Media Fraction (χ_bed)</option>
+          </select>
+
+          <label for="cmapSelect">Colormap:</label>
+          <select id="cmapSelect" class="select-cmap">
+            <option value="viridis" selected>Viridis</option>
+            <option value="coolwarm">Coolwarm (Diverging)</option>
+            <option value="plasma">Plasma</option>
+          </select>
+        </div>
+      </header>
+
+      <section class="canvas-container">
+        <canvas id="simCanvas" width="512" height="512"></canvas>
+
+        <div class="canvas-overlays-bar">
+          <label class="overlay-chk"><input type="checkbox" id="chkShell" checked /> Shell</label>
+          <label class="overlay-chk"><input type="checkbox" id="chkLifters" checked /> Lifters</label>
+          <label class="overlay-chk"><input type="checkbox" id="chkBed" checked /> Charge Bed</label>
+          <label class="overlay-chk"><input type="checkbox" id="chkVectors" /> Vectors</label>
+        </div>
+      </section>
+
+      <!-- Bottom Scientific Charts -->
+      <footer class="charts-drawer">
+        <div class="chart-card">
+          <h4>Rheology Flow Curve: μ_app(γ̇) & τ(γ̇)</h4>
+          <canvas id="flowCurveCanvas" width="380" height="175"></canvas>
+        </div>
+        <div class="chart-card">
+          <h4>Time History: Torque & Kinetic Energy</h4>
+          <canvas id="timeSeriesCanvas" width="380" height="175"></canvas>
+        </div>
+      </footer>
+    </main>
+
+    <!-- Right: Control Sidebar -->
+    <aside id="sidebarPanel" class="sidebar-panel">
+      <!-- Injected by src/ui/panel.ts -->
+    </aside>
   </div>
+
+  <div id="modalContainer"></div>
+
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
