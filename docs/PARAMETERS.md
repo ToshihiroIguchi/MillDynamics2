@@ -98,13 +98,13 @@ live, as the parameters change. Load the `dataviz` skill before building it.
 
 | Parameter | Symbol | Default | Range | Notes |
 | --- | --- | --- | --- | --- |
-| Grid resolution | `N` | 256 | 128 / 256 / 512 | Powers of two only (multigrid). Rebuilds the solver. |
+| Grid resolution | `N` | **128** | 64 / 128 / 256 / 512 | Powers of two only (multigrid). Rebuilds the solver. 128 is the *interactive* default; 256 costs ~4x per frame (~6 fps on a typical laptop) and is meant for a converged run, not for browsing. `d_p/Δx = 0.25` at `N = 128`, so the sub-grid porous closure stays valid. |
 | Cell size | `Δx` | *derived* `= L/N` | | Displayed in mm, alongside `d_p/Δx` |
-| Sub-steps per frame | `n_sub` | 2 | 1 – 8 | |
+| Sub-steps per frame | `n_sub` | **1** | 1 – 8 | Full solver steps per rendered frame, so `n_sub` advances `n_sub·Δt` of simulated time at proportional cost. It is *not* a subdivision of one `Δt`. |
 | CFL number | `CFL` | 2.0 | 0.2 – 5.0 | Semi-Lagrangian tolerates > 1 |
 | Maximum time step | `Δt_max` | 2e-3 s | 1e-5 – 1e-2 | |
 | Fixed time step | – | off | on / off | Required by the temporal-order verification cases |
-| Viscous solver iterations | `n_visc` | 24 | 4 – 128 | Quality/FPS trade; never a stability risk (§NUMERICS 5) |
+| Viscous solver iterations | `n_visc` | **12** | 4 – 128 | Quality/FPS trade; never a stability risk (§NUMERICS 5). Measured: at mill viscosities the reference case is unchanged to 4 significant figures between 12 and 48 sweeps. |
 | Multigrid cycles (max) | `n_mg` | 6 | 1 – 20 | |
 | Multigrid tolerance | `tol_mg` | 1e-5 | 1e-8 – 1e-3 | |
 | Penalization time | `η` | 1e-4 s | 1e-7 – 1e-2 | Smaller = stiffer wall; error `~sqrt(ην)` |

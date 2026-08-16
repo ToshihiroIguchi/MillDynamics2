@@ -27,8 +27,8 @@ export class Solver {
   muMax: Real = 1e4;
 
   // Numerical parameters
-  cfl: Real = 0.4;
-  maxDt: Real = 0.01;
+  cfl: Real = 2.0;      // PARAMETERS.md §6 default (semi-Lagrangian tolerates > 1)
+  maxDt: Real = 2e-3;   // NUMERICS.md §2.1 dt_max
   fixedDt: Real = 0.0;
   nSub: i32 = 1;
   nVisc: i32 = 24;
@@ -70,6 +70,8 @@ export class Solver {
   // Simulation time
   time: Real = 0.0;
   lastDt: Real = 0.0;
+  // Shell torque sampled inside subStep, immediately after penalization.
+  lastTorque: Real = 0.0;
 
   // Primary staggered fields
   u: Float64Array = new Float64Array(0);
@@ -208,17 +210,33 @@ export class Solver {
     }
   }
 
+  // NUMERICS.md §2.1:
+  //   dt_cfl  = CFL * dx / max(|u| over the FLUID region, |u_wall|_max = omega*R)
+  //   dt_grav = sqrt(dx / |g|)
+  //   dt      = min(dt_cfl, dt_grav, dt_max)
+  // Maxing over the solid region as well would pick up omega*r out at the domain
+  // corners (r = L/sqrt(2) > R) and throttle dt for no physical reason.
   calcAdaptiveDt(): Real {
-    let maxVel: Real = 0.0;
-    const nu = (this.N + 1) * this.N;
-    for (let i = 0; i < nu; i++) {
-      const spd = Math.abs(this.u[i]);
-      if (spd > maxVel) maxVel = spd;
+    const N = this.N;
+    let maxVel: Real = Math.abs(this.omega) * this.millRadius;
+
+    for (let j = 0; j < N; j++) {
+      for (let i = 0; i <= N; i++) {
+        const cL = i > 0 ? idxC(N, i - 1, j) : idxC(N, 0, j);
+        const cR = i < N ? idxC(N, i, j) : idxC(N, N - 1, j);
+        if (0.5 * (this.chi[cL] + this.chi[cR]) >= 0.5) continue;
+        const spd = Math.abs(this.u[idxU(N, i, j)]);
+        if (spd > maxVel) maxVel = spd;
+      }
     }
-    const nv = this.N * (this.N + 1);
-    for (let i = 0; i < nv; i++) {
-      const spd = Math.abs(this.v[i]);
-      if (spd > maxVel) maxVel = spd;
+    for (let j = 0; j <= N; j++) {
+      for (let i = 0; i < N; i++) {
+        const cB = j > 0 ? idxC(N, i, j - 1) : idxC(N, i, 0);
+        const cT = j < N ? idxC(N, i, j) : idxC(N, i, N - 1);
+        if (0.5 * (this.chi[cB] + this.chi[cT]) >= 0.5) continue;
+        const spd = Math.abs(this.v[idxV(N, i, j)]);
+        if (spd > maxVel) maxVel = spd;
+      }
     }
 
     let dt = this.maxDt;
@@ -226,6 +244,13 @@ export class Solver {
       const dtCfl = (this.cfl * this.dx) / maxVel;
       if (dtCfl < dt) dt = dtCfl;
     }
+
+    const gMag = Math.sqrt(this.gx * this.gx + this.gy * this.gy);
+    if (gMag > 1e-12) {
+      const dtGrav = Math.sqrt(this.dx / gMag);
+      if (dtGrav < dt) dt = dtGrav;
+    }
+
     return dt;
   }
 
@@ -255,7 +280,7 @@ export class Solver {
       updateBedMask(
         this.chiBed, this.uMedia, this.vMedia,
         N, dx, this.cx, this.cy, this.millRadius,
-        this.fillJ, this.thetaRepose, this.omega, this.kSlip
+        this.fillJ, this.thetaRepose, this.omega, this.kSlip, this.chi
       );
     }
 
@@ -331,7 +356,30 @@ export class Solver {
       this.boundaryMode, uWallTop, uWallBot, 0.0, 0.0
     );
 
-    // 5. Pressure Poisson solve: div(u*) -> rhs -> solve -> grad(p)
+    // 5. Brinkman penalization: solid obstacle / mill drum / lifters.
+    // NUMERICS.md §2: penalization runs *before* the projection so that the
+    // projection removes the divergence penalization introduces. Running it
+    // after the projection leaves max|div u| at O(10^2) and lets the pressure
+    // field diverge inside the fictitious solid.
+    penalizeVelocity(
+      this.u, this.v, this.uSolid, this.vSolid, this.chi,
+      N, dt, this.etaPenal
+    );
+
+    // 5b. Sample the shell torque here and nowhere else. KERNEL_REFERENCE.md §10
+    // reads the momentum exchange off (u - u_wall) scaled by chi/eta ~ 1e4, which
+    // is only the penalization residual while u is the post-penalization field.
+    // After the projection the same expression measures the pressure-gradient
+    // kick instead, inflating the torque by ~3 orders of magnitude.
+    if (this.millRadius > 0.0) {
+      this.lastTorque = computeShellTorque(
+        this.u, this.v, this.chi,
+        N, dx, this.cx, this.cy,
+        this.omega, this.rho, this.etaPenal, this.millRadius
+      );
+    }
+
+    // 6. Pressure Poisson solve: div(u***) -> rhs -> solve -> grad(p)
     calcDivergence(this.div, this.u, this.v, N, inv);
 
     const b0 = this.mg.b[0];
@@ -349,25 +397,23 @@ export class Solver {
       this.p[k] = phi0[k];
     }
 
-    // 6. Velocity projection: u = u* - dt/rho * grad(p)
+    // 7. Velocity projection: u = u*** - dt/rho * grad(p)
     const factor = dt / this.rho;
     applyGradient(this.u, this.v, this.p, N, inv, factor, this.boundaryMode);
-
-    // 7. Brinkman penalization: solid obstacle / mill drum / lifters
-    penalizeVelocity(
-      this.u, this.v, this.uSolid, this.vSolid, this.chi,
-      N, dt, this.etaPenal
-    );
   }
 
+  // NUMERICS.md §2.1: "Per rendered frame, take n_sub steps and render once."
+  // The previous implementation divided one dt into n_sub pieces instead, so
+  // raising n_sub multiplied the cost per frame while advancing exactly the same
+  // amount of simulated time — the opposite of what the control is for.
   step(dtOverride: Real = 0.0): void {
-    const dt = dtOverride > 0.0 ? dtOverride : (this.fixedDt > 0.0 ? this.fixedDt : this.calcAdaptiveDt());
-    this.lastDt = dt;
-    const subDt = dt / <Real>this.nSub;
-
     for (let s = 0; s < this.nSub; s++) {
-      this.subStep(subDt);
-      this.time += subDt;
+      const dt = dtOverride > 0.0
+        ? dtOverride
+        : (this.fixedDt > 0.0 ? this.fixedDt : this.calcAdaptiveDt());
+      this.lastDt = dt;
+      this.subStep(dt);
+      this.time += dt;
     }
   }
 
@@ -410,24 +456,31 @@ export class Solver {
     return maxV;
   }
 
+  // Area fraction of the *fluid* that is yielded, i.e. where the local shear
+  // stress tau = mu_app * gammaDot exceeds the yield stress tau_y.
+  // The old form counted gammaDot > 1/m over every cell of the box, solid
+  // included, which returned 1.000 for essentially any configuration.
   diagYieldedFraction(): Real {
     if (this.tauY <= 0.0) return 1.0;
-    let yielded: i32 = 0;
+    let yieldedArea: Real = 0.0;
+    let fluidArea: Real = 0.0;
     const nc = this.N * this.N;
-    const invM = 1.0 / this.m;
     for (let i = 0; i < nc; i++) {
-      if (this.gammaDot[i] > invM) {
-        yielded++;
-      }
+      const w = 1.0 - this.chi[i];
+      if (w <= 0.01) continue;
+      fluidArea += w;
+      if (this.muC[i] * this.gammaDot[i] > this.tauY) yieldedArea += w;
     }
-    return <Real>yielded / <Real>nc;
+    return fluidArea > 0.0 ? yieldedArea / fluidArea : 0.0;
   }
 
   diagTorque(): Real {
+    // Mill mode: value captured mid-step, right after penalization (see subStep).
+    if (this.millRadius > 0.0) return this.lastTorque;
     return computeShellTorque(
       this.u, this.v, this.chi,
       this.N, this.dx, this.cx, this.cy,
-      this.omega, this.rho, this.etaPenal
+      this.omega, this.rho, this.etaPenal, this.millRadius
     );
   }
 

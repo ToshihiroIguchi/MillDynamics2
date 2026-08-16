@@ -12,8 +12,11 @@ export const PRESETS: PresetDef[] = [
   {
     id: 'baseline',
     name: '1. Baseline Industrial Ball Mill',
-    description: 'D=1m, 75% Nc, 8 lifters, J=0.30, Herschel–Bulkley slurry (K=0.5, n=0.7, τy=5 Pa, ρ=1800 kg/m³)',
+    description: 'D=1m, 75% Nc, 8 lifters, J=0.30, Herschel–Bulkley slurry (K=0.5, n=0.7, τy=5 Pa, ρ=1800 kg/m³) at the interactive resolution N=128',
     overrides: {
+      N: 128,
+      nSub: 1,
+      nVisc: 12,
       D: 1.0,
       nLifters: 8,
       hLifter: 0.025,

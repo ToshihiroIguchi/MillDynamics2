@@ -1,5 +1,9 @@
 // assembly/index.ts
-import { Real } from './types';
+import {
+  Real,
+  MODE_MILL, MODE_PERIODIC, MODE_CAVITY, MODE_CHANNEL,
+  MODE_INFLOW, MODE_COUETTE, MODE_SLUMP, MODE_OBSTACLE
+} from './types';
 import { calcDivergence, applyGradient } from './grid';
 import { muApp } from './rheology';
 import { computeStrainRate } from './strain';
@@ -16,6 +20,17 @@ import { Solver } from './solver';
 export function add(a: f64, b: f64): f64 {
   return a + b;
 }
+
+// Boundary-mode constants, exported so the TypeScript side can assert against
+// the authoritative values instead of hand-copying them (see src/modes.ts).
+export const EXPORT_MODE_MILL: i32 = MODE_MILL;
+export const EXPORT_MODE_PERIODIC: i32 = MODE_PERIODIC;
+export const EXPORT_MODE_CAVITY: i32 = MODE_CAVITY;
+export const EXPORT_MODE_CHANNEL: i32 = MODE_CHANNEL;
+export const EXPORT_MODE_INFLOW: i32 = MODE_INFLOW;
+export const EXPORT_MODE_COUETTE: i32 = MODE_COUETTE;
+export const EXPORT_MODE_SLUMP: i32 = MODE_SLUMP;
+export const EXPORT_MODE_OBSTACLE: i32 = MODE_OBSTACLE;
 
 const g_solver: Solver = new Solver();
 const g_rve: RveSolver = new RveSolver();
@@ -89,6 +104,14 @@ export function setFixedTimeStep(dt: Real): void {
   g_solver.fixedDt = dt;
 }
 
+export function setCFL(cfl: Real): void {
+  g_solver.cfl = cfl;
+}
+
+export function setMaxTimeStep(dt: Real): void {
+  g_solver.maxDt = dt;
+}
+
 export function setInitialField(kind: i32, amp: Real, k: Real): void {
   g_solver.setInitialField(kind, amp, k);
 }
@@ -124,6 +147,10 @@ export function step(dt: Real): void {
 
 export function getTime(): Real { return g_solver.time; }
 export function getLastDt(): Real { return g_solver.lastDt; }
+// Shell rotation angle [rad], so the lifter overlay can read the solver's own
+// angle instead of re-integrating omega*dt on the JS side and drifting out of
+// step with the chi mask.
+export function getMillAngle(): Real { return g_solver.millAngle; }
 
 export function ptrU(): usize { return g_solver.u.dataStart; }
 export function ptrV(): usize { return g_solver.v.dataStart; }
@@ -393,6 +420,34 @@ export function createRve(N: i32, L: Real, dp: Real, phi: Real, mu: Real, fx: Re
 
 export function stepRve(dt: Real): void {
   g_rve.step(dt);
+}
+
+// Brinkman penalization time for the RVE discs. The penalized solid behaves as a
+// porous medium of permeability K_eta = (mu/rho)*eta, so eta must satisfy
+// K_eta << K_physical or the discs leak more than the packing itself resists.
+export function setRvePenalization(eta: Real): void {
+  g_rve.etaPenal = eta;
+}
+
+export function setRveViscousIterations(k: i32): void {
+  g_rve.nVisc = k;
+}
+
+export function setRveMaxSubSteps(k: i32): void {
+  g_rve.nSubMax = k;
+}
+
+// Diffusion number dt*nu/dx^2 and the dt bound that keeps it acceptable.
+export function getRveDiffusionNumber(dt: Real): Real {
+  return g_rve.diffusionNumber(dt);
+}
+
+export function getRveMaxStableDt(): Real {
+  return g_rve.maxStableDt();
+}
+
+export function setRveDensity(rho: Real): void {
+  g_rve.rho = rho;
 }
 
 export function getRvePermeability(): Real {

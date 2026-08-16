@@ -1,47 +1,83 @@
 {
-  "version": 1,
-  "description": "2D Darcy-Forchheimer and pore shear rate closure constants calibrated by micro-scale RVE study (E6)",
+  "version": 2,
+  "description": "2D Darcy viscous closure measured from micro-scale RVE Stokes flow (experiment E6). A_2D is calibrated; B_2D and C_gamma are NOT and carry their 3D Ergun placeholder values.",
+  "provenance": {
+    "verified": false,
+    "verification_status": "A_2D is derived from a measured permeability, but the measurement is NOT yet verified. Two configurations that should agree (same geometry, both Stokes, both with the viscous diffusion number bounded below 1) differ by ~4.5x at phi=0.65. Until that is explained these values are provisional. See docs/VALIDATION.md section 5.5.",
+    "source": "results/E6_rve.csv",
+    "method": "K = eps^3 dp^2 / (A_2D (1-eps)^2), solved for A_2D from the measured Stokes permeability of a square disc array",
+    "verification": "each point is reported against Gebart (1992) transverse permeability for the same array; see K_ratio_vs_gebart",
+    "min_gap_cells_for_resolved": 5.0,
+    "n_points": 6,
+    "n_resolved": 6
+  },
   "dp_reference_m": 0.002,
+  "uncalibrated": {
+    "B_2D": {
+      "value": 1.75,
+      "calibrated": false,
+      "reason": "Forchheimer inertial constant needs a Re_p sweep into the inertial regime; E6 as run is Stokes only. 1.75 is the 3D Ergun placeholder."
+    },
+    "C_gamma": {
+      "value": 1.0,
+      "calibrated": false,
+      "reason": "Pore shear-rate constant needs the non-Newtonian RVE cases (n != 1, tau_y > 0), which E6 as run does not cover."
+    }
+  },
   "points": [
     {
       "solid_fraction_phi": 0.36,
       "porosity_epsilon": 0.64,
-      "A_2D": 55.37,
-      "B_2D": 1.182,
-      "C_gamma": 0.958,
-      "K_perm_m2": 1.4613e-07
+      "A_2D": 1015.96,
+      "K_perm_m2": 7.9638e-09,
+      "K_ratio_vs_gebart": 0.1266,
+      "gap_cells": 20.67,
+      "resolved": true
     },
     {
       "solid_fraction_phi": 0.4,
       "porosity_epsilon": 0.6,
-      "A_2D": 57.8,
-      "B_2D": 1.23,
-      "C_gamma": 0.97,
-      "K_perm_m2": 9.3426e-08
+      "A_2D": 1336.4,
+      "K_perm_m2": 4.0407e-09,
+      "K_ratio_vs_gebart": 0.099,
+      "gap_cells": 18.33,
+      "resolved": true
     },
     {
       "solid_fraction_phi": 0.45,
       "porosity_epsilon": 0.55,
-      "A_2D": 61.2,
-      "B_2D": 1.29,
-      "C_gamma": 0.985,
-      "K_perm_m2": 5.37e-08
+      "A_2D": 1977.66,
+      "K_perm_m2": 1.6618e-09,
+      "K_ratio_vs_gebart": 0.0711,
+      "gap_cells": 15.56,
+      "resolved": true
     },
     {
       "solid_fraction_phi": 0.5,
       "porosity_epsilon": 0.5,
-      "A_2D": 65.0,
-      "B_2D": 1.35,
-      "C_gamma": 1.0,
-      "K_perm_m2": 3.0769e-08
+      "A_2D": 2678.17,
+      "K_perm_m2": 7.4678e-10,
+      "K_ratio_vs_gebart": 0.0578,
+      "gap_cells": 12.94,
+      "resolved": true
     },
     {
       "solid_fraction_phi": 0.6,
       "porosity_epsilon": 0.4,
-      "A_2D": 73.8,
-      "B_2D": 1.47,
-      "C_gamma": 1.03,
-      "K_perm_m2": 9.6357e-09
+      "A_2D": 2660.8,
+      "K_perm_m2": 2.6725e-10,
+      "K_ratio_vs_gebart": 0.0847,
+      "gap_cells": 8.06,
+      "resolved": true
+    },
+    {
+      "solid_fraction_phi": 0.65,
+      "porosity_epsilon": 0.35,
+      "A_2D": 2249.02,
+      "K_perm_m2": 1.8049e-10,
+      "K_ratio_vs_gebart": 0.1454,
+      "gap_cells": 5.78,
+      "resolved": true
     }
   ]
 }

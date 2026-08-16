@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="MillDynamics2 — Non-Newtonian Slurry Hydrodynamics & Porous Media Grinding Mill Simulator in WebAssembly">
   <title>MillDynamics2 — Non-Newtonian Slurry Simulation</title>
-  <link rel="stylesheet" href="/src/style.css">
+  <!-- Inline SVG data URI: the site must stay self-contained and offline-capable. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230f172a' stroke='%2338bdf8' stroke-width='2'/%3E%3Cpath d='M4 20a12 12 0 0 0 24 0z' fill='%2338bdf8' opacity='.55'/%3E%3C/svg%3E">
+  <!-- style.css is imported from src/main.ts so Vite bundles and hashes it;
+       an absolute /src/... href breaks under a GitHub Pages sub-path. -->
 </head>
 <body>
   <div id="app" class="app-layout">
@@ -37,7 +40,9 @@
       </header>
 
       <section class="canvas-container">
-        <canvas id="simCanvas" width="512" height="512"></canvas>
+        <!-- Wider than tall: the extra width is the colour-bar gutter, so the
+             square field itself still fills the full canvas height. -->
+        <canvas id="simCanvas" width="640" height="512"></canvas>
 
         <div class="canvas-overlays-bar">
           <label class="overlay-chk"><input type="checkbox" id="chkShell" checked /> Shell</label>
@@ -45,6 +50,8 @@
           <label class="overlay-chk"><input type="checkbox" id="chkBed" checked /> Charge Bed</label>
           <label class="overlay-chk"><input type="checkbox" id="chkVectors" /> Vectors</label>
         </div>
+
+        <div id="hudReadout" class="hud-readout">initialising…</div>
       </section>
 
       <!-- Bottom Scientific Charts -->

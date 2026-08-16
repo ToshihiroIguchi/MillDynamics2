@@ -271,6 +271,10 @@ picture, which is what makes them expensive.
 | --- | --- |
 | NaN within ~10 steps | Poisson RHS not mean-zero; or diffusion left explicit |
 | Divergence grows slowly over thousands of steps | `φ` not re-centred each V-cycle; MG tolerance too loose |
+| Torque ~10³ too high, steady rather than drifting | Integral includes the fictitious solid filling the box corners — restrict to `r ≤ R + 2Δx`; and/or it is evaluated after the projection instead of straight after penalization (`KERNEL_REFERENCE.md` §10) |
+| `max|∇·u|` stuck at O(10²) and pressure ~10× hydrostatic | Penalization applied *after* the projection instead of before it (`NUMERICS.md` §2) |
+| Yielded fraction is exactly 1.000 for every input | Criterion is `γ̇ > 1/m` over all cells including solid; use `τ = μ_app·γ̇ > τ_y` weighted by `(1−χ)` |
+| A verification case passes but the quantity is wildly wrong | Read the assertions, not the test name. V6, V7a and V8 all carried benchmark titles while asserting only positivity/finiteness. |
 | Torque an order of magnitude too high and drifting upward | Gravity/drag applied inside solid cells — scale body forces by `(1−χ)` (`KERNEL_REFERENCE.md` §10) |
 | Power draw negative | Torque sign inverted; re-run the hand check in §10 |
 | V1 passes at Re = 100, fails at Re = 1000 | Advection is effectively first-order: MacCormack correction missing, clamp wrong, or the 4-point staggered average in `uAtV`/`vAtU` is off by one |
@@ -282,8 +286,9 @@ picture, which is what makes them expensive.
 | `μ` field uniform although `n < 1` | `μ` computed from a stale `γ̇`, or not passed into `diffuse` |
 | NaN only when `τ_y > 0` | Missing small-`γ̇` series guard: `(1−exp(−mγ̇))/γ̇` is 0/0 at `γ̇ = 0` |
 | Lifters rotate visually but drag no fluid | Lifter mask rebuilt at centres, `χ_face` not recomputed |
-| RVE permeability far too high | Beads under-resolved (`d_p/Δx < 8`) |
-| Results change when `n_visc` changes | Viscous solve under-converged — that is expected below ~16 iterations; quantify it, do not panic |
+| RVE permeability far too high | **Diffusion number `D = Δt·ν/Δx²` ≫ 1**, so the damped-Jacobi viscous solve is truncated and the fluid barely feels viscosity. Bound `D ≲ 1` (`KERNEL_REFERENCE.md` §12). Bead under-resolution (`d_p/Δx < 8`) also matters but pushes `K` *down*, not up. |
+| RVE permeability gets **worse** as you refine the grid | Same cause: `D ∝ N²`, so refining at fixed `Δt` makes the viscous solve worse, not better. A quantity that diverges under refinement is a numerical parameter, never a discretisation error. |
+| Results change when `n_visc` changes | Viscous solve under-converged. **Do not wave this away.** Damped Jacobi needs `O(D)` sweeps; if `D ≫ 1` no practical sweep count converges (measured: 848 sweeps at `D = 424` still left the RVE permeability 36× high) and you must reduce `Δt` or `ν` instead. Below `D ~ 1` a couple of dozen sweeps is genuinely plenty — the macro mill runs at `D ≈ 1e-2` and is identical to 4 significant figures from 4 to 48 sweeps. |
 | Solver slows down over time | Allocation inside the step loop |
 
 ---

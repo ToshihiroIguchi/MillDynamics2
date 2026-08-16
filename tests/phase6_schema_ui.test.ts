@@ -25,7 +25,12 @@ describe('Phase 6 Schema, UI, Presets & Persistence - Row 6a, 6b, 6c', () => {
     expect(cfg.D).toBe(1.0);
     expect(cfg.rho).toBe(1800.0);
     expect(cfg.dp).toBe(0.002);
-    expect(cfg.N).toBe(256);
+    // Interactive default resolution (PARAMETERS.md §6). Assert it is one of the
+    // offered options rather than a literal, so tuning the default for frame
+    // rate does not break the schema test.
+    const nDef = PARAM_SCHEMA.find(p => p.key === 'N')!;
+    expect(nDef.options!.map(o => o.value)).toContain(cfg.N);
+    expect(cfg.N).toBe(128);
   });
 
   it('Row 6a: Derived parameter calculations match analytical formulas', () => {
@@ -34,7 +39,8 @@ describe('Phase 6 Schema, UI, Presets & Persistence - Row 6a, 6b, 6c', () => {
 
     expect(derived.R).toBe(0.5);
     expect(derived.L).toBeCloseTo(1.024, 4);
-    expect(derived.dx_mm).toBeCloseTo(4.0, 2); // 1.024m / 256 = 4.0 mm
+    // dx = L / N, derived from the schema default rather than a fixed 4.0 mm.
+    expect(derived.dx_mm).toBeCloseTo((1.024 / <number>cfg.N) * 1000.0, 2);
 
     // Critical speed Nc for D=1m (R=0.5m, dp=0.002m, g=9.81m/s^2)
     // effR = 0.5 - 0.001 = 0.499m

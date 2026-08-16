@@ -1,0 +1,12 @@
+# MillDynamics2 E6 - micro-scale RVE permeability (measured)
+# generated: 2026-08-15T16:17:11.561Z
+# dp_m=0.002 mu_Pa_s=0.001 rho_kg_m3=1000 fx_Pa_m=0.01 N=64 relaxation_times=6
+# packing=square, one disc per periodic cell
+# K_gebart is Gebart (1992) transverse permeability for a square array.
+phi,epsilon,N,gap_cells,K_measured_m2,K_gebart_m2,K_ratio,A_2D
+0.36,0.64,64,20.67,7.963756e-9,6.289421e-8,0.12662,1015.961
+0.4,0.6,64,18.33,4.040705e-9,4.080790e-8,0.09902,1336.400
+0.45,0.55,64,15.56,1.661773e-9,2.337998e-8,0.07108,1977.659
+0.5,0.5,64,12.94,7.467776e-10,1.292294e-8,0.05779,2678.174
+0.6,0.4,64,8.06,2.672546e-10,3.154847e-9,0.08471,2660.801
+0.65,0.35,64,5.78,1.804862e-10,1.241113e-9,0.14542,2249.020

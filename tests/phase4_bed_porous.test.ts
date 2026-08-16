@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { loadSolver } from './helpers/loadWasm';
+import { MODE_SLUMP } from '../src/modes';
 
 const MODE_PERIODIC = 2;
-const MODE_SLUMP = 4;
+
 
 describe('Phase 4 Bed Geometry, Porous Media & Robustness - Row 4a, 4b, 4c', () => {
   it('Row 4a: Chord bisection & Bed area = J * pi * R^2 within 1% for all J in {0.15, 0.30, 0.45}', async () => {

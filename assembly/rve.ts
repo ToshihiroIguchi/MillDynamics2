@@ -22,6 +22,11 @@ export class Rng {
   }
 }
 
+// Target diffusion number dt*nu/dx^2 for the RVE viscous solve. Measured
+// K/K_Gebart at N=64, phi=0.65: D=424 -> 105, D=42 -> 14.3, D=4.2 -> 2.08,
+// D=0.85 -> 0.65. Bounded below ~1 the answer is a genuine measurement.
+const D_TARGET: Real = 0.5;
+
 // Disc representation in 2D
 export class Disc {
   x: Real;
@@ -127,6 +132,18 @@ export class RveSolver {
   mu: Real = 0.001;
   fx: Real = 1.0;
   etaPenal: Real = 1e-5;
+  // Damped-Jacobi sweeps for the implicit viscous solve.
+  //
+  // Kept at 24, which is ample *provided* the diffusion number D = dt*nu/dx^2 is
+  // O(1) — which step() now enforces. Do not try to compensate for a large D by
+  // raising this instead: Jacobi is a smoother, and 848 sweeps at D = 424 still
+  // left the measured permeability 36x above Gebart (1992). See
+  // VALIDATION.md §5.1 and KERNEL_REFERENCE.md §12.
+  nVisc: i32 = 24;
+  // Cap on the internal subdivision in step(), so a pathological dt cannot hang
+  // the solver outright; exceeding it means D is no longer bounded, and the
+  // caller should lower dt or raise rho instead.
+  nSubMax: i32 = 4000;
 
   u: Float64Array = new Float64Array(0);
   v: Float64Array = new Float64Array(0);
@@ -197,7 +214,34 @@ export class RveSolver {
     this.mg.init(N, L, 8, 1e-6, MODE_PERIODIC);
   }
 
+  // Diffusion number of the implicit viscous solve at this dt.
+  diffusionNumber(dt: Real): Real {
+    const nu = this.mu / this.rho;
+    return (dt * nu) / (this.dx * this.dx);
+  }
+
+  // Largest dt for which nVisc damped-Jacobi sweeps actually solve the implicit
+  // Helmholtz system. Raising the sweep count instead does not work: Jacobi
+  // cannot resolve a D >> 1 operator at any practical iteration count (measured:
+  // 848 sweeps at D = 424 still left K 36x above Gebart). Bounding D is the fix.
+  maxStableDt(): Real {
+    const nu = this.mu / this.rho;
+    if (nu <= 0.0) return 1e30;
+    return (D_TARGET * this.dx * this.dx) / nu;
+  }
+
+  // Advance by dt, subdividing as needed to keep the diffusion number bounded.
+  // The caller therefore gets a correct answer for any dt, paying in substeps.
   step(dt: Real): void {
+    const dtMax = this.maxStableDt();
+    let nSub = <i32>Math.ceil(dt / dtMax);
+    if (nSub < 1) nSub = 1;
+    if (nSub > this.nSubMax) nSub = this.nSubMax;
+    const sub = dt / <Real>nSub;
+    for (let s = 0; s < nSub; s++) this.subStep(sub);
+  }
+
+  subStep(dt: Real): void {
     const N = this.N;
     const dx = this.dx;
     const inv = this.inv;
@@ -230,11 +274,20 @@ export class RveSolver {
       this.u, this.v, this.rhsU, this.rhsV, this.tmpU, this.tmpV,
       this.muC, this.muN,
       N, dx, inv, dt, this.rho,
-      24, 0.8,
+      this.nVisc, 0.8,
       MODE_PERIODIC, 0.0, 0.0, 0.0, 0.0
     );
 
-    // 4. Pressure projection
+    // 4. Brinkman penalization of stationary discs (uSolid = 0, vSolid = 0).
+    // Before the projection, per NUMERICS.md §2, so the projection removes the
+    // divergence penalization introduces rather than leaving the disc interiors
+    // non-solenoidal. Measured on its own this changed the permeability by under
+    // 5% (2.44e-6 -> 2.56e-6 at N=256): it is the correct ordering, but it was
+    // *not* the cause of the ~10^3 permeability error — the diffusion number
+    // was. See VALIDATION.md §5.1.
+    penalizeVelocity(this.u, this.v, this.uSolid, this.vSolid, this.chi, N, dt, this.etaPenal);
+
+    // 5. Pressure projection
     calcDivergence(this.div, this.u, this.v, N, inv);
     const b0 = this.mg.b[0];
     const rhoInvDt = this.rho / dt;
@@ -245,9 +298,6 @@ export class RveSolver {
     const phi0 = this.mg.phi[0];
     for (let k = 0; k < nc; k++) this.p[k] = phi0[k];
     applyGradient(this.u, this.v, this.p, N, inv, dt / this.rho, MODE_PERIODIC);
-
-    // 5. Brinkman penalization of stationary discs (uSolid = 0, vSolid = 0)
-    penalizeVelocity(this.u, this.v, this.uSolid, this.vSolid, this.chi, N, dt, this.etaPenal);
   }
 
   getSuperficialVelocity(): Real {

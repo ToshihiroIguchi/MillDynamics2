@@ -1,12 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { loadSolver } from './helpers/loadWasm';
 
-const MODE_CAVITY = 1;
-const MODE_PERIODIC = 2;
-const MODE_CHANNEL = 3;
-const MODE_SLUMP = 4;
-const MODE_OBSTACLE = 5;
-const MODE_INFLOW = 6;
+// The six boundary-mode literals that used to live here all disagreed with
+// assembly/types.ts. They are unused in this file, so they are simply gone;
+// tests/modes.test.ts now pins src/modes.ts against the WASM exports.
 
 describe('Phase 3 Penalization, SDF & Torque - U12, V6, V7', () => {
   it('U12: Penalization relaxation and spatial SDF masking', async () => {
@@ -38,7 +35,12 @@ describe('Phase 3 Penalization, SDF & Torque - U12, V6, V7', () => {
     expect(Math.abs(uFace - expectedU)).toBeLessThan(1e-10);
   });
 
-  it('V7a: Taylor-Couette torque matches analytical value within 5%', async () => {
+  // NOTE: this case does NOT measure a torque. It imposes the analytical
+  // Taylor-Couette profile and then range-checks the analytical formula itself;
+  // the solver is never run and computeShellTorque is never called. Renamed to
+  // say so. A genuine V7a would step the solver to steady state and compare
+  // diagTorque() against T_analytical. See VALIDATION.md §4.7.
+  it('V7a: Taylor-Couette analytical torque formula is in the expected range (does NOT measure solver torque)', async () => {
     const { e, view } = await loadSolver(true);
     const N = 128;
     const L = 1.0;
@@ -147,7 +149,11 @@ describe('Phase 3 Penalization, SDF & Torque - U12, V6, V7', () => {
     expect(relL2).toBeLessThan(0.02); // < 2% per spec
   });
 
-  it('V6: Flow past a stationary cylinder obstacle vs Dennis & Chang (1970) (Re=20 C_D ~ 2.05 +- 10%)', async () => {
+  // NOTE: this case does NOT measure a drag coefficient. It checks the cylinder
+  // mask and that penalization slows the core; diagCylinderDrag() is never
+  // called and C_D is never compared to Dennis & Chang. Renamed to say so.
+  // See VALIDATION.md §4.7.
+  it('V6: Cylinder mask and penalization behave correctly (does NOT measure C_D)', async () => {
     const { e, view } = await loadSolver(true);
     const N = 64;
     const L = 1.0;

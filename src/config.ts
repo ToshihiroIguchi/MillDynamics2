@@ -77,14 +77,20 @@ export const PARAM_SCHEMA: ParamDef[] = [
 
   // 6. Numerics
   {
-    key: 'N', group: 'numerics', label: 'Grid Resolution (N)', unit: '-', default: 256, rebuildsSolver: true,
-    options: [{ value: 128, label: '128 × 128 (Fast)' }, { value: 256, label: '256 × 256 (Standard)' }, { value: 512, label: '512 × 512 (High)' }]
+    key: 'N', group: 'numerics', label: 'Grid Resolution (N)', unit: '-', default: 128, rebuildsSolver: true,
+    notes: 'Interactive default is 128 (Δx = 8 mm at D = 1 m). 256 is roughly 4× the cost per frame; use it for a converged run rather than for browsing.',
+    options: [
+      { value: 64, label: '64 × 64 (Draft)' },
+      { value: 128, label: '128 × 128 (Interactive — default)' },
+      { value: 256, label: '256 × 256 (Standard)' },
+      { value: 512, label: '512 × 512 (High)' }
+    ]
   },
-  { key: 'nSub', group: 'numerics', label: 'Sub-steps per frame', unit: '-', default: 2, min: 1, max: 8, step: 1, rebuildsSolver: false },
+  { key: 'nSub', group: 'numerics', label: 'Sub-steps per frame', unit: '-', default: 1, min: 1, max: 8, step: 1, rebuildsSolver: false, notes: 'Solver steps taken per rendered frame. Higher advances more simulated time per frame at proportionally more cost.' },
   { key: 'cfl', group: 'numerics', label: 'CFL Number', unit: '-', default: 2.0, min: 0.2, max: 5.0, step: 0.2, rebuildsSolver: false },
   { key: 'maxDt', group: 'numerics', label: 'Max Time Step (Δt)', unit: 's', default: 0.002, min: 1e-5, max: 0.01, step: 0.0005, rebuildsSolver: false },
   { key: 'fixedDt', group: 'numerics', label: 'Fixed Time Step (0=adaptive)', unit: 's', default: 0.0, min: 0.0, max: 0.01, step: 0.0005, rebuildsSolver: false },
-  { key: 'nVisc', group: 'numerics', label: 'Viscous Iterations', unit: '-', default: 24, min: 4, max: 128, step: 4, rebuildsSolver: false },
+  { key: 'nVisc', group: 'numerics', label: 'Viscous Iterations', unit: '-', default: 12, min: 4, max: 128, step: 4, rebuildsSolver: false, notes: 'Damped-Jacobi sweeps for the implicit variable-viscosity Helmholtz solve. At mill viscosities the solution is unchanged to 4 significant figures between 12 and 48 sweeps.' },
   { key: 'etaPenal', group: 'numerics', label: 'Penalization Time (η)', unit: 's', default: 1e-4, min: 1e-7, max: 1e-2, step: 1e-5, rebuildsSolver: false },
   {
     key: 'advectionScheme', group: 'numerics', label: 'Advection Scheme', unit: '-', default: 'maccormack', rebuildsSolver: false,
@@ -113,6 +119,25 @@ export function getDefaultConfig(): ConfigValues {
     cfg[p.key] = p.default;
   }
   return cfg;
+}
+
+// Chord offset d such that the circular segment below the chord has area J*pi*R^2.
+// Mirrors assembly/bed.ts::solveChordOffset so that the overlay drawn on the
+// canvas lands on the same line the solver uses for chi_bed.
+export function solveChordOffset(R: number, J: number): number {
+  if (J <= 0.0) return R;
+  if (J >= 1.0) return -R;
+  const target = J * Math.PI * R * R;
+  let lo = -R;
+  let hi = R;
+  for (let it = 0; it < 60; it++) {
+    const mid = 0.5 * (lo + hi);
+    const s = Math.sqrt(Math.max(R * R - mid * mid, 0.0));
+    const area = R * R * Math.acos(mid / R) - mid * s;
+    if (area > target) lo = mid;
+    else hi = mid;
+  }
+  return 0.5 * (lo + hi);
 }
 
 export function computeDerived(cfg: ConfigValues) {
@@ -149,11 +174,26 @@ export function computeDerived(cfg: ConfigValues) {
   const uRelEst = (1.0 - kSlip) * tipSpeed;
   const gammaPore = (C_gamma * uRelEst) / (eps * Math.max(sqrtK, 1e-12));
 
+  // Bed free surface, in the same convention as assembly/bed.ts:
+  // the bed is { r <= R } intersect { (x,y).n + d <= 0 }, with the unit normal n
+  // tilted away from the direction of rotation by the dynamic angle of repose.
+  const thetaR = (<number>cfg.thetaRepose * Math.PI) / 180.0;
+  const signOmega = omega >= 0.0 ? 1.0 : -1.0;
+  const bedNx = -signOmega * Math.sin(thetaR);
+  const bedNy = Math.cos(thetaR);
+  const bedD = solveChordOffset(R, <number>cfg.fillJ);
+  // Half-length of the chord where it cuts the shell circle.
+  const bedHalfChord = Math.sqrt(Math.max(R * R - bedD * bedD, 0.0));
+
   return {
     R,
     L,
     cx,
     cy,
+    bedNx,
+    bedNy,
+    bedD,
+    bedHalfChord,
     Nc_rev_s,
     Nc_rpm,
     omega,

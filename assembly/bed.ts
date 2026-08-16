@@ -38,7 +38,8 @@ export function updateBedMask(
   J: Real,
   thetaRepose: Real,
   omega: Real,
-  kSlip: Real
+  kSlip: Real,
+  chi: Float64Array = new Float64Array(0)
 ): void {
   if (J <= 0.0 || R <= 0.0) {
     const nc = N * N;
@@ -59,7 +60,13 @@ export function updateBedMask(
   const nx = -signOmega * Math.sin(thetaRepose);
   const ny = Math.cos(thetaRepose);
 
-  // 1. Bed indicator at cell centres: smooth transition over dx
+  // 1. Bed indicator at cell centres: smooth transition over dx.
+  // Excluded from the solid: there is no grinding media inside the shell wall or
+  // inside a lifter. Without this the Ergun drag (coefficient ~1e5 1/s) and the
+  // Brinkman penalization (chi/eta ~ 1e4 1/s) both act on the same wall-adjacent
+  // cells, pinning them at k_slip*omega*r while the shell demands omega*r, which
+  // shows up as a large permanent spurious shell torque.
+  const useChi = chi.length == N * N;
   const invWidth = 1.0 / dx;
   for (let j = 0; j < N; j++) {
     const y = (j + 0.5) * dx - cy;
@@ -77,7 +84,10 @@ export function updateBedMask(
       const dBed = Math.max(dCyl, dChord);
       
       // chiBed: 1 inside bed (dBed < 0), 0 outside bed (dBed > 0)
-      chiBed[idxC(N, i, j)] = 0.5 * (1.0 - Math.tanh(dBed * invWidth));
+      const c = idxC(N, i, j);
+      let cb = 0.5 * (1.0 - Math.tanh(dBed * invWidth));
+      if (useChi) cb *= (1.0 - chi[c]);
+      chiBed[c] = cb;
     }
   }
 

@@ -508,6 +508,26 @@ export function shellTorque(rho: Real, eta: Real): Real {
 }
 ```
 
+### Two conditions this expression silently depends on
+
+Both were violated in the first implementation and together inflated the torque
+by ~10^3. See `VALIDATION.md` §4.2.
+
+**(a) It must be evaluated on the post-penalization field, and nowhere else.**
+`chi/eta` is ~1e4, so this expression only means "momentum exchange" while
+`u - u_wall` is the penalization residual. Under the §2 ordering penalization is
+followed by the projection, which kicks the solid cells by `-(dt/rho) grad p`;
+evaluated after that, the same formula measures the pressure kick amplified by
+1e4. Sample the torque inside the step, right after `penalize`, not from a
+pull-style `diagTorque()` called between steps.
+
+**(b) Restrict the sum to `r <= R + 2 dx`.**
+Everything beyond the shell is fictitious solid filling the square box, and §8
+deliberately does *not* mask the Poisson operator there, so those cells carry a
+meaningless pressure gradient that penalization must cancel every step. Binning
+the contributions by radius put >95 % of the unrestricted total at `r/R > 1.05`
+— i.e. in the domain corners.
+
 Sign check to run once by hand: with `ω > 0` (CCW) and the fluid lagging, the
 tangential component of `(u − u_wall)` is clockwise, so `r × F` is negative and
 the returned driving torque is **positive**. Power `P = T·ω > 0`. If your power
@@ -548,9 +568,22 @@ If your numbers are far outside these, stop and debug rather than tuning.
 | `μ_app` in the free region | 0.2 – 0.6 Pa·s |
 | `K_perm` (`ε=0.4, d_p=2mm, A=150`) | 4.74e-9 m² |
 | `γ̇_pore` at `|u_rel| = 0.1 m/s` | ≈ 3.6e3 s⁻¹ |
-| Shell torque | O(10 – 100) N·m per metre |
-| Power draw | O(50 – 500) W per metre |
+| Shell torque, **smooth drum, no charge** | O(10 – 100) N·m per metre |
+| Power draw, **smooth drum, no charge** | O(50 – 500) W per metre |
+| Shell torque, `J = 0.30` charge | O(10^3) N·m per metre — see the note below |
 | `max |∇·u|·Δx/U_ref` | < 1e-4 |
+
+### The charge dominates the torque, and it is not grid-converged
+
+The two torque rows above differ by more than an order of magnitude, so quote
+which one you mean. Measured at `N = 128`, `t ~ 0.3 s`: smooth drum 138 N·m/m,
++8 lifters 177, +`J = 0.30` charge 2493. The charge term is a direct consequence
+of assumption A4 — the media are pinned kinematically at `k_slip*omega` across
+the whole bed, so the Ergun drag does work against that prescribed motion over
+the entire bed area, and the shell supplies it. It also scales roughly as `1/N`
+(5038 / 2491 / 1317 at `N` = 64 / 128 / 256), because it lives in an interface
+layer one `dx` thick. Absolute charge-loaded power draw is therefore indicative
+only; parameter *trends* are the usable output.
 
 ### Expected, and not a bug
 
@@ -561,3 +594,49 @@ warning go away. A 2D laminar Navier–Stokes solution at that Reynolds number i
 a legitimate solution of the equations as written — it will show unsteady vortex
 shedding off the lifters — but it is **not** a validated turbulence prediction,
 and `VALIDATION.md` must say so.
+
+---
+
+## 12. The viscous solve has a validity limit, and the RVE is on the wrong side of it
+
+`diffuseVelocity` solves the implicit variable-viscosity Helmholtz system with
+damped Jacobi. Damped Jacobi is a *smoother*, not a solver: the sweep count
+needed to actually converge scales with the diffusion number
+
+```
+D = dt * nu / dx^2 ,      nu = mu / rho
+```
+
+Below `D ~ 1` a couple of dozen sweeps is plenty. Above it the solve is silently
+truncated — no warning, no NaN, just a fluid that feels less viscosity than you
+asked for. Raising the sweep count does not rescue it: at `D = 424`, 848 sweeps
+still left the RVE permeability 36x above the benchmark.
+
+**The two scales sit on opposite sides of this line.**
+
+| | `dx` | `nu` | `dt` | `D` |
+| --- | --- | --- | --- | --- |
+| Macro mill, `N = 128` | 8e-3 m | ~3e-4 m^2/s | 2e-3 s | **~1e-2** |
+| RVE, `N = 128`, `rho = 1` | 1.7e-5 m | 1e-3 m^2/s | 5e-4 s | **~1.7e3** |
+
+So the macro solver is unconditionally fine — which is exactly why sweeping
+`n_visc` from 4 to 48 changes the reference case by nothing at all — and the RVE
+was catastrophically under-resolved from the day it was written.
+
+`RveSolver.step` now subdivides `dt` internally so `D <= 0.5`, and
+`maxStableDt()` reports the bound. Two things make that affordable: pass a
+**physical density** (`rho = 1000` for water, not the class default of 1.0, which
+inflates `nu` by 1e3), and remember `D ∝ N^2`, so refining the RVE grid costs
+`N^4` in total work, not `N^2`.
+
+Sanity numbers for the square array at `d_p = 2 mm`, `phi = 0.65`
+(`K_Gebart = 1.241e-9 m^2`), `N = 64`:
+
+| `D` | 424 | 42 | 4.2 | 0.85 |
+| --- | --- | --- | --- | --- |
+| `K / K_Gebart` | 105 | 14.3 | 2.08 | 0.65 |
+
+And note the benchmark's own limits: Gebart's transverse formula is a
+narrow-gap lubrication asymptote, valid as `phi -> phi_max`. At `phi = 0.36` it
+over-predicts badly, so a low-`phi` ratio is not a solver error. Quote the solid
+fraction whenever you quote the ratio.

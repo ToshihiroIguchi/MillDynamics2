@@ -53,8 +53,38 @@ function generateCoolwarmLUT(): Uint8Array {
   return lut;
 }
 
+// Plasma. The UI has offered this option since phase 6 but no LUT existed, so
+// selecting it silently rendered viridis.
+function generatePlasmaLUT(): Uint8Array {
+  const lut = new Uint8Array(256 * 3);
+  const stops = [
+    { t: 0.00, r: 13,  g: 8,   b: 135 },
+    { t: 0.25, r: 126, g: 3,   b: 168 },
+    { t: 0.50, r: 204, g: 71,  b: 120 },
+    { t: 0.75, r: 248, g: 149, b: 64  },
+    { t: 1.00, r: 240, g: 249, b: 33  }
+  ];
+  for (let i = 0; i < 256; i++) {
+    const t = i / 255.0;
+    let s0 = stops[0], s1 = stops[1];
+    for (let k = 0; k < stops.length - 1; k++) {
+      if (t >= stops[k].t && t <= stops[k + 1].t) {
+        s0 = stops[k];
+        s1 = stops[k + 1];
+        break;
+      }
+    }
+    const f = (t - s0.t) / (s1.t - s0.t);
+    lut[i * 3 + 0] = Math.round(s0.r + (s1.r - s0.r) * f);
+    lut[i * 3 + 1] = Math.round(s0.g + (s1.g - s0.g) * f);
+    lut[i * 3 + 2] = Math.round(s0.b + (s1.b - s0.b) * f);
+  }
+  return lut;
+}
+
 const VIRIDIS_LUT = generateViridisLUT();
 const COOLWARM_LUT = generateCoolwarmLUT();
+const PLASMA_LUT = generatePlasmaLUT();
 
 export function mapScalarToRgb(valNorm: number, map: ColormapName): [number, number, number] {
   let t = valNorm;
@@ -64,6 +94,8 @@ export function mapScalarToRgb(valNorm: number, map: ColormapName): [number, num
 
   if (map === 'coolwarm') {
     return [COOLWARM_LUT[idx * 3], COOLWARM_LUT[idx * 3 + 1], COOLWARM_LUT[idx * 3 + 2]];
+  } else if (map === 'plasma') {
+    return [PLASMA_LUT[idx * 3], PLASMA_LUT[idx * 3 + 1], PLASMA_LUT[idx * 3 + 2]];
   } else if (map === 'yieldState') {
     // 0 = unyielded dead zone (deep blue), 1 = yielded (bright yellow/orange)
     if (valNorm > 0.5) {

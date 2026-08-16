@@ -3,15 +3,53 @@
 
 import { ConfigValues } from '../config';
 
+// Superscript rendering for decade tick labels (10^-2 ... 10^5).
+const SUPER_DIGITS = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+function supers(exp: number): string {
+  const neg = exp < 0;
+  const digits = String(Math.abs(Math.round(exp)))
+    .split('')
+    .map(d => SUPER_DIGITS[Number(d)])
+    .join('');
+  return (neg ? '⁻' : '') + digits;
+}
+
+// Herschel-Bulkley with Papanastasiou regularization, matching assembly/rheology.ts.
+export function muAppJs(
+  gd: number, K: number, n: number, tauY: number,
+  mReg: number, muMin: number, muMax: number
+): number {
+  const g = Math.max(gd, 1e-12);
+  let mu = K * Math.pow(g, n - 1.0);
+  if (tauY > 0.0) mu += (tauY * (1.0 - Math.exp(-mReg * g))) / g;
+  if (mu < muMin) mu = muMin;
+  if (mu > muMax) mu = muMax;
+  return mu;
+}
+
 export class FlowCurvePlot {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
+  private lastKey: string = '';
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Could not get flow curve canvas context');
     this.ctx = ctx;
+  }
+
+  // The curve depends only on the six rheology parameters and the marker
+  // position, so redrawing it on every animation frame was pure waste.
+  renderIfChanged(cfg: ConfigValues, currentMeanGammaDot: number): void {
+    const key = [
+      cfg.K, cfg.n, cfg.tauY, cfg.m, cfg.muMin, cfg.muMax,
+      currentMeanGammaDot > 0 ? Math.log10(currentMeanGammaDot).toFixed(2) : 'x',
+      this.canvas.width, this.canvas.height
+    ].join('|');
+    if (key === this.lastKey) return;
+    this.lastKey = key;
+    this.render(cfg, currentMeanGammaDot);
   }
 
   render(cfg: ConfigValues, currentMeanGammaDot: number = 0): void {
@@ -50,7 +88,7 @@ export class FlowCurvePlot {
       ctx.moveTo(x, padTop);
       ctx.lineTo(x, padTop + plotH);
       ctx.stroke();
-      ctx.fillText(`10${g === 0 ? '⁰' : (g === 1 ? '¹' : (g === 2 ? '²' : (g === 3 ? '³' : (g === -1 ? '⁻¹' : (g === -2 ? '⁻²' : (g === 4 ? '⁴' : '⁵'))))))}`, x, padTop + plotH + 14);
+      ctx.fillText(`10${supers(g)}`, x, padTop + plotH + 14);
     }
 
     ctx.textAlign = 'right';
@@ -60,17 +98,38 @@ export class FlowCurvePlot {
       ctx.moveTo(padLeft, y);
       ctx.lineTo(padLeft + plotW, y);
       ctx.stroke();
-      ctx.fillText(`10${m === 0 ? '⁰' : (m === 2 ? '²' : (m === 4 ? '⁴' : (m === -2 ? '⁻²' : '⁻⁴')))}`, padLeft - 6, y + 3);
+      ctx.fillText(`10${supers(m)}`, padLeft - 6, y + 3);
+    }
+
+    // Right-hand axis for the shear stress curve: tau from 1e-2 to 1e5.
+    const logMinTau = -2.0;
+    const logMaxTau = 5.0;
+    const rangeTau = logMaxTau - logMinTau;
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#a3e635';
+    for (let s = logMinTau; s <= logMaxTau; s += 2) {
+      const y = padTop + plotH - ((s - logMinTau) / rangeTau) * plotH;
+      ctx.fillText(`10${supers(s)}`, padLeft + plotW + 5, y + 3);
     }
 
     // Axis labels
     ctx.fillStyle = '#cbd5e1';
-    ctx.fillText('γ̇ [s⁻¹]', padLeft + plotW / 2 + 10, padTop + plotH + 26);
+    ctx.textAlign = 'center';
+    ctx.fillText('γ̇ [s⁻¹]', padLeft + plotW / 2, padTop + plotH + 26);
     ctx.save();
     ctx.translate(12, padTop + plotH / 2);
     ctx.rotate(-Math.PI / 2);
     ctx.textAlign = 'center';
+    ctx.fillStyle = '#38bdf8';
     ctx.fillText('μ_app [Pa·s]', 0, 0);
+    ctx.restore();
+    ctx.save();
+    ctx.translate(w - 10, padTop + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#a3e635';
+    ctx.fillText('τ [Pa]', 0, 0);
     ctx.restore();
 
     // Compute curve points
@@ -81,42 +140,70 @@ export class FlowCurvePlot {
     const muMin = <number>cfg.muMin;
     const muMax = <number>cfg.muMax;
 
-    const nPoints = 100;
-    const pts: { x: number; y: number }[] = [];
+    const nPoints = 160;
+    const muPts: { x: number; y: number }[] = [];
+    const tauPts: { x: number; y: number }[] = [];
 
     for (let i = 0; i <= nPoints; i++) {
       const logG = logMinG + (i / nPoints) * rangeG;
       const gd = Math.pow(10, logG);
-
-      // Herschel-Bulkley with Papanastasiou exponential regularization
-      let muVal = 0.0;
-      if (tauY > 0.0 && gd > 1e-12) {
-        const expTerm = 1.0 - Math.exp(-mReg * gd);
-        muVal = (tauY * expTerm) / gd + K * Math.pow(gd, n - 1.0);
-      } else if (tauY > 0.0) {
-        muVal = tauY * mReg + K * Math.pow(Math.max(gd, 1e-12), n - 1.0);
-      } else {
-        muVal = K * Math.pow(Math.max(gd, 1e-12), n - 1.0);
-      }
-
-      if (muVal < muMin) muVal = muMin;
-      if (muVal > muMax) muVal = muMax;
+      const muVal = muAppJs(gd, K, n, tauY, mReg, muMin, muMax);
+      const px = padLeft + ((logG - logMinG) / rangeG) * plotW;
 
       const logMu = Math.log10(Math.max(muVal, 1e-6));
-      const px = padLeft + ((logG - logMinG) / rangeG) * plotW;
-      const py = padTop + plotH - ((logMu - logMinMu) / rangeMu) * plotH;
-      pts.push({ x: px, y: py });
+      muPts.push({ x: px, y: padTop + plotH - ((logMu - logMinMu) / rangeMu) * plotH });
+
+      // tau = mu_app * gammaDot — the curve the chart title has always promised
+      // but which was never drawn.
+      const logTau = Math.log10(Math.max(muVal * gd, 1e-6));
+      tauPts.push({ x: px, y: padTop + plotH - ((logTau - logMinTau) / rangeTau) * plotH });
     }
 
-    // Draw mu_app curve (cyan)
+    const drawSeries = (pts: { x: number; y: number }[], colour: string, dash: number[]) => {
+      ctx.save();
+      ctx.strokeStyle = colour;
+      ctx.lineWidth = 2.0;
+      ctx.setLineDash(dash);
+      ctx.beginPath();
+      ctx.rect(padLeft, padTop, plotW, plotH);
+      ctx.clip();
+      ctx.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        if (i === 0) ctx.moveTo(pts[i].x, pts[i].y);
+        else ctx.lineTo(pts[i].x, pts[i].y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    drawSeries(muPts, '#38bdf8', []);
+    drawSeries(tauPts, '#a3e635', [5, 3]);
+
+    // Legend, top-right: mu_app has decayed and tau has not yet risen that far,
+    // so this corner stays clear for any physically sensible parameter set.
+    ctx.save();
+    ctx.font = '10px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    const lx = padLeft + plotW - 74;
+    const ly = padTop + 9;
     ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 2.0;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    for (let i = 0; i < pts.length; i++) {
-      if (i === 0) ctx.moveTo(pts[i].x, pts[i].y);
-      else ctx.lineTo(pts[i].x, pts[i].y);
-    }
+    ctx.moveTo(lx, ly);
+    ctx.lineTo(lx + 14, ly);
     ctx.stroke();
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText('μ_app', lx + 18, ly + 3);
+    ctx.strokeStyle = '#a3e635';
+    ctx.setLineDash([5, 3]);
+    ctx.beginPath();
+    ctx.moveTo(lx, ly + 13);
+    ctx.lineTo(lx + 14, ly + 13);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#a3e635';
+    ctx.fillText('τ', lx + 18, ly + 16);
+    ctx.restore();
 
     // Draw operating point marker if available
     if (currentMeanGammaDot > 0) {

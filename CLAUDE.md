@@ -23,12 +23,22 @@ complementary problem (continuum slurry flow rather than discrete media motion).
 | Role | Owner |
 | --- | --- |
 | Requirements analysis, physics/numerics specification, architecture, phase plan, experiment design, acceptance criteria | **Claude** |
-| Implementation, refactoring, build configuration, test authoring, running experiments, filling in `docs/VALIDATION.md`, deployment | **Gemini** |
+| **Running the experiments (E1–E7) and reporting their results** | **Claude** |
+| Implementation, refactoring, build configuration, test authoring, filling in `docs/VALIDATION.md`, deployment | **Gemini** |
 
 Claude writes and maintains the documents under `docs/`. Gemini writes the code.
 If Gemini finds that a specification in `docs/` is wrong or infeasible, it must
 record the deviation in `docs/VALIDATION.md` under "Deviations from spec" rather
 than silently changing behaviour.
+
+Claude runs the batch experiments itself (`npm run experiments`) rather than
+delegating them, because the experiment *design* and the judgement of whether a
+result is physical belong to the same owner. When a run contradicts a number
+already written down, Claude corrects the written number and says so — a
+parametric result is never reported without stating the resolution, the
+averaging window, and whether it is grid-converged. Claude may also fix solver
+code when an experiment exposes a defect, and records it under
+`docs/VALIDATION.md` §4.
 
 ## Repository Information
 
