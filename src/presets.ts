@@ -8,11 +8,38 @@ export interface PresetDef {
   overrides: Partial<ConfigValues>;
 }
 
+// Nc for the D = 1 m reference mill (d_p = 2 mm, g = 9.81 m/s²) is 42.34 rpm.
+// Presets stated in %Nc store the corresponding rpm rounded to the control's
+// 0.05 rpm step; the E1-E7 runner recomputes the exact value with
+// config.ts::rpmFromSpeedFraction rather than reading it back from here.
 export const PRESETS: PresetDef[] = [
   {
+    id: 'default',
+    name: '0. Default — Smooth Drum, 100 cP Slurry',
+    description:
+      'The start-up state: D=1 m, 30 rpm (≈ 71% Nc), no lifters, J=0.30, Newtonian slurry of 100 cP (K=0.1 Pa·s, n=1, τy=0) at N=128',
+    overrides: {
+      N: 128,
+      nSub: 1,
+      nVisc: 12,
+      D: 1.0,
+      nLifters: 0,
+      millRpm: 30.0,
+      rotDirection: 'CCW',
+      fillJ: 0.30,
+      porosity: 0.40,
+      dp: 0.002,
+      rho: 1800.0,
+      rheologyMode: 'newtonian',
+      K: 0.1,
+      n: 1.0,
+      tauY: 0.0
+    }
+  },
+  {
     id: 'baseline',
-    name: '1. Baseline Industrial Ball Mill',
-    description: 'D=1m, 75% Nc, 8 lifters, J=0.30, Herschel–Bulkley slurry (K=0.5, n=0.7, τy=5 Pa, ρ=1800 kg/m³) at the interactive resolution N=128',
+    name: '1. Baseline Industrial Ball Mill (E1–E7 reference)',
+    description: 'D=1m, 75% Nc (31.75 rpm), 8 lifters, J=0.30, Herschel–Bulkley slurry (K=0.5, n=0.7, τy=5 Pa, ρ=1800 kg/m³) at the interactive resolution N=128',
     overrides: {
       N: 128,
       nSub: 1,
@@ -22,7 +49,7 @@ export const PRESETS: PresetDef[] = [
       hLifter: 0.025,
       wLifter: 0.020,
       alphaLifter: 0.0,
-      speedFraction: 75.0,
+      millRpm: 31.75, // 75.0% of Nc = 42.34 rpm
       rotDirection: 'CCW',
       fillJ: 0.30,
       porosity: 0.40,
@@ -82,18 +109,18 @@ export const PRESETS: PresetDef[] = [
   {
     id: 'low-speed',
     name: '6. Low-Speed Cascading',
-    description: 'Sub-critical tumbling regime at 55% Nc with higher charge fill J=0.35',
+    description: 'Sub-critical tumbling regime at 55% Nc (23.30 rpm) with higher charge fill J=0.35',
     overrides: {
-      speedFraction: 55.0,
+      millRpm: 23.30, // 55.0% of Nc = 42.34 rpm
       fillJ: 0.35
     }
   },
   {
     id: 'supercritical',
     name: '7. Supercritical Centrifuging',
-    description: 'Over-speed at 110% Nc exceeding critical centrifuging speed',
+    description: 'Over-speed at 110% Nc (46.55 rpm) exceeding critical centrifuging speed',
     overrides: {
-      speedFraction: 110.0,
+      millRpm: 46.55, // 109.9% of Nc = 42.34 rpm
       fillJ: 0.30
     }
   },

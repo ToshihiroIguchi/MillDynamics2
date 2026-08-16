@@ -13,7 +13,8 @@
 import fs from 'fs';
 import path from 'path';
 import { loadSolver } from '../tests/helpers/loadWasm';
-import { getDefaultConfig, ConfigValues, computeDerived } from '../src/config';
+import { ConfigValues, computeDerived, rpmFromSpeedFraction } from '../src/config';
+import { applyPreset } from '../src/presets';
 import { generateCsv, DataPoint } from '../src/export/csv';
 import { MODE_SLUMP } from '../src/modes';
 
@@ -161,30 +162,50 @@ async function doRun(cfg: ConfigValues, label: string, fname: string, tEnd = T_E
   return summary;
 }
 
-// Baseline for the sweeps. N=128 (Delta x = 8 mm) is the interactive default and
-// the resolution every sweep below uses, so the sweeps are internally
-// comparable. E5 quantifies what changing N does to the absolute level.
+// Baseline for the sweeps: the "1. Baseline Industrial Ball Mill" preset
+// (D = 1 m, 8 lifters, J = 0.30, Herschel-Bulkley K = 0.5, n = 0.7, tau_y = 5,
+// rho = 1800) at 75 % Nc. This is pinned to the preset rather than to the schema
+// defaults, which are the *UI* start-up state and are free to change (they are
+// now a smooth drum with a 100 cP Newtonian slurry); the published E1-E7 numbers
+// must keep referring to one fixed reference case.
+//
+// N=128 (Delta x = 8 mm) is the resolution every sweep below uses, so the sweeps
+// are internally comparable. E5 quantifies what changing N does to the absolute
+// level.
 function sweepBase(): ConfigValues {
-  const cfg = getDefaultConfig();
+  const cfg = applyPreset('baseline');
   cfg.N = 128;
   cfg.nVisc = 12;
+  // The preset stores a rounded rpm for display; use the exact 75 % Nc value so
+  // the sweeps are reproducible to full precision.
+  cfg.millRpm = rpmFromSpeedFraction(cfg, 75.0);
   return cfg;
 }
 
+// Optional section filter: `npx tsx scripts/run_experiments.ts E4` re-runs only
+// E4 and merges it into the existing summary.json, instead of wiping results/
+// and re-running all 52 cases (E5 alone is a quarter of an hour). With no
+// argument the full suite runs and results/ is rebuilt from scratch.
+const ONLY = process.argv.slice(2).filter(a => !a.startsWith('-'));
+const wanted = (section: string) => ONLY.length === 0 || ONLY.some(o => section.startsWith(o) || o.startsWith(section));
+
 async function main() {
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
-  // Clear stale CSVs from earlier (pre-fix) runs so results/ cannot mix vintages.
-  for (const f of fs.readdirSync(outDir)) {
-    if (f.endsWith('.csv') || f.endsWith('.json') || f.endsWith('.md')) {
-      fs.unlinkSync(path.join(outDir, f));
+  if (ONLY.length === 0) {
+    // Clear stale CSVs from earlier (pre-fix) runs so results/ cannot mix vintages.
+    for (const f of fs.readdirSync(outDir)) {
+      if (f.endsWith('.csv') || f.endsWith('.json') || f.endsWith('.md')) {
+        fs.unlinkSync(path.join(outDir, f));
+      }
     }
   }
 
-  console.log('=== MillDynamics2 experiments E1-E7 ===');
+  console.log(`=== MillDynamics2 experiments ${ONLY.length ? ONLY.join(', ') : 'E1-E7'} ===`);
   console.log(`Averaging window ${T_AVG_START}-${T_END} s; "!" marks a run whose`);
   console.log('torque drifted more than 5% across that window.\n');
 
   // ---- E1: rheology sweep -------------------------------------------------
+  if (wanted('E1')) {
   console.log('--- E1: rheology sweep (n x tau_y) ---');
   for (const n of [0.4, 0.6, 0.8, 1.0, 1.2]) {
     for (const tauY of [0.0, 5.0, 20.0, 50.0]) {
@@ -194,40 +215,57 @@ async function main() {
       await doRun(cfg, `E1 n=${n} tauY=${tauY}`, `E1_n${n}_tauY${tauY}.csv`);
     }
   }
+  }
 
   // ---- E2: mill speed sweep ----------------------------------------------
+  if (wanted('E2')) {
   console.log('\n--- E2: mill speed sweep ---');
+  // Swept in %Nc, which is what the literature reports; stored as the equivalent
+  // rpm, which is what the solver and the UI take.
   for (const spd of [40, 55, 65, 75, 85, 95, 110]) {
     const cfg = sweepBase();
-    cfg.speedFraction = spd;
+    cfg.millRpm = rpmFromSpeedFraction(cfg, spd);
     await doRun(cfg, `E2 speed=${spd}%Nc`, `E2_speed_${spd}pct.csv`);
+  }
   }
 
   // ---- E3: fill level -----------------------------------------------------
+  if (wanted('E3')) {
   console.log('\n--- E3: fill level sweep ---');
   for (const J of [0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45]) {
     const cfg = sweepBase();
     cfg.fillJ = J;
     await doRun(cfg, `E3 J=${J}`, `E3_fill_J${J}.csv`);
   }
+  }
 
   // ---- E4: media size -----------------------------------------------------
+  if (wanted('E4')) {
   console.log('\n--- E4: media size sweep ---');
   for (const dp of [0.0005, 0.001, 0.002, 0.005]) {
     const cfg = sweepBase();
     cfg.dp = dp;
+    // Nc = (1/2pi)*sqrt(g/(R - dp/2)) depends on dp, so the rpm has to be taken
+    // AFTER dp is set for this sweep to hold 75 %Nc, which is how the published
+    // table was produced. Setting it before pins the shell rpm across the sweep
+    // instead, and shifts the dp = 5 mm torque by 0.16 %.
+    cfg.millRpm = rpmFromSpeedFraction(cfg, 75.0);
     await doRun(cfg, `E4 dp=${dp * 1000}mm`, `E4_dp_${dp * 1000}mm.csv`);
+  }
   }
 
   // ---- E5: grid convergence ----------------------------------------------
+  if (wanted('E5')) {
   console.log('\n--- E5: grid convergence (identical dt) ---');
   for (const N of [64, 128, 256, 512]) {
     const cfg = sweepBase();
     cfg.N = N;
     await doRun(cfg, `E5 N=${N}`, `E5_grid_N${N}.csv`);
   }
+  }
 
   // ---- E7: regularization / numerical sensitivity ------------------------
+  if (wanted('E7')) {
   console.log('\n--- E7a: Papanastasiou m ---');
   for (const m of [50, 500, 5000, 50000]) {
     const cfg = sweepBase();
@@ -249,13 +287,23 @@ async function main() {
     cfg.nVisc = nVisc;
     await doRun(cfg, `E7c nVisc=${nVisc}`, `E7c_nVisc_${nVisc}.csv`);
   }
+  }
 
-  fs.writeFileSync(
-    path.join(outDir, 'summary.json'),
-    JSON.stringify(allSummaries, null, 2),
-    'utf-8'
-  );
-  console.log(`\n=== ${allSummaries.length} runs complete -> results/summary.json ===`);
+  // A filtered run replaces only its own labels in the existing summary and
+  // leaves every other entry untouched, so a partial re-run cannot silently
+  // drop the runs it did not repeat.
+  const summaryPath = path.join(outDir, 'summary.json');
+  let merged = allSummaries;
+  if (ONLY.length > 0 && fs.existsSync(summaryPath)) {
+    const previous: Summary[] = JSON.parse(fs.readFileSync(summaryPath, 'utf-8'));
+    const fresh = new Map(allSummaries.map(s => [s.label, s]));
+    merged = previous.map(p => fresh.get(p.label) ?? p);
+    for (const s of allSummaries) {
+      if (!previous.some(p => p.label === s.label)) merged.push(s);
+    }
+  }
+  fs.writeFileSync(summaryPath, JSON.stringify(merged, null, 2), 'utf-8');
+  console.log(`\n=== ${allSummaries.length} runs complete -> results/summary.json (${merged.length} entries) ===`);
 
   const unsettled = allSummaries.filter(s => !s.settled);
   if (unsettled.length > 0) {

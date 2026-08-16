@@ -1,5 +1,5 @@
 # MillDynamics2 Simulation Export
-# ExportedAt: 2026-08-15T16:04:24.110Z
+# ExportedAt: 2026-08-16T05:07:13.325Z
 # Parameter Metadata Block:
 #   D (Mill Diameter): 1 m
 #   margin (Domain Margin): 0.012 -
@@ -7,7 +7,7 @@
 #   hLifter (Lifter Height): 0.025 m
 #   wLifter (Lifter Width): 0.02 m
 #   alphaLifter (Lifter Face Angle): 0 deg
-#   speedFraction (Speed Fraction): 75 %Nc
+#   millRpm (Mill Speed): 31.755347989391172 rpm
 #   rotDirection (Rotation Direction): CCW -
 #   gravity (Gravity): 9.81 m/s²
 #   fillJ (Fill Fraction (J)): 0.25 -
@@ -17,7 +17,7 @@
 #   kSlip (Charge Slip Factor): 0.85 -
 #   rho (Slurry Density): 1800 kg/m³
 #   rheologyMode (Rheology Mode): herschel-bulkley -
-#   K (Consistency Index (K)): 0.5 Pa·sⁿ
+#   K (Viscosity / Consistency (K)): 0.5 Pa·sⁿ
 #   n (Flow Index (n)): 0.7 -
 #   tauY (Yield Stress (τy)): 5 Pa
 #   m (Regularization (m)): 1000 s
@@ -45,6 +45,7 @@
 #   Domain Size L: 1.0240 m
 #   Cell Size dx: 8.000 mm
 #   Critical Speed Nc: 42.34 rpm (0.706 rev/s)
+#   Speed Fraction: 75.00 %Nc
 #   Angular Velocity omega: 3.3254 rad/s
 #   Tip Speed: 1.663 m/s
 #   Permeability K_perm: 4.7407e-9 m^2

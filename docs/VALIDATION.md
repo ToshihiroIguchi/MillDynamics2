@@ -152,6 +152,21 @@ Method, and it applies to every table below:
 - Resolution `N = 128` (`Δx = 8 mm`) for every sweep, so the sweeps are mutually
   comparable. E5 quantifies what `N` does to the absolute level — and the answer
   is "a lot", see below.
+- Sweep base: preset **"1. Baseline Industrial Ball Mill"** (`D = 1 m`, 8 lifters,
+  `J = 0.30`, Herschel–Bulkley `K = 0.5`, `n = 0.7`, `τ_y = 5 Pa`, `ρ = 1800`) at
+  75 %`N_c` = 31.7553 rpm. The runner pins this preset explicitly. It previously
+  took the schema defaults, which are the *UI start-up state* and have since
+  changed to a smooth drum with a 100 cP Newtonian slurry.
+- Speed is entered in rpm since 2026-08-16 and `%N_c` is derived from it. E2 and
+  E4 are still *designed* in %`N_c` and convert with `rpmFromSpeedFraction`;
+  because `N_c` depends on `d_p`, E4 takes the conversion after setting `d_p`, so
+  that sweep continues to hold 75 %`N_c` rather than a fixed shell rpm.
+- **All 52 runs were re-executed through the new config path on 2026-08-16** and
+  agree with the figures already published here to within `1.5e-4` relative (the
+  round-trip %`N_c` → rpm → ω is not bit-exact). `results/SUMMARY.md` regenerates
+  character-for-character identical apart from the E2 speed column, now labelled
+  in rpm, and the E2 40 %`N_c` yielded fraction, which rounds to 99.5 % instead of
+  99.6 %. That one digit is corrected in the table below; nothing else moved.
 - Fixed `Δt = 2e-3 s`, run to `t = 3 s`, **all quantities are means over the
   1.5–3 s window** with the standard deviation over that window quoted, plus a
   drift check between the two halves of the window. The reference case settles by
@@ -183,15 +198,15 @@ Method, and it applies to every table below:
 
 **E2 — mill speed sweep**
 
-| %Nc | T [N·m/m] | ±sd | P [kW/m] | yielded [%] | bed γ̇ [1/s] | free γ̇ [1/s] | max|u| [m/s] |
+| speed [rpm] (%Nc) | T [N·m/m] | ±sd | P [kW/m] | yielded [%] | bed γ̇ [1/s] | free γ̇ [1/s] | max|u| [m/s] |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 40 | 1309.1 | 15.3 | 2.32 | 99.6 | 0.70 | 1.31 | 0.92 |
-| 55 | 1797.3 | 19.9 | 4.38 | 99.6 | 0.95 | 1.51 | 1.26 |
-| 65 | 2129.0 | 23.4 | 6.14 | 99.7 | 1.13 | 1.71 | 1.49 |
-| 75 | 2466.2 | 27.4 | 8.20 | 99.7 | 1.30 | 1.95 | 1.72 |
-| 85 | 2804.1 | 30.8 | 10.57 | 99.8 | 1.47 | 2.23 | 1.95 |
-| 95 | 3145.3 | 33.8 | 13.25 | 99.8 | 1.65 | 2.51 | 2.18 |
-| 110 | 3668.4 | 39.5 | 17.89 | 99.9 | 1.91 | 2.93 | 2.53 |
+| 16.94 (40%) | 1309.1 | 15.3 | 2.32 | 99.5 | 0.70 | 1.31 | 0.92 |
+| 23.29 (55%) | 1797.3 | 19.9 | 4.38 | 99.6 | 0.95 | 1.51 | 1.26 |
+| 27.52 (65%) | 2129.0 | 23.4 | 6.14 | 99.7 | 1.13 | 1.71 | 1.49 |
+| 31.76 (75%) | 2466.2 | 27.4 | 8.20 | 99.7 | 1.30 | 1.95 | 1.72 |
+| 35.99 (85%) | 2804.1 | 30.8 | 10.57 | 99.8 | 1.47 | 2.23 | 1.95 |
+| 40.22 (95%) | 3145.3 | 33.8 | 13.25 | 99.8 | 1.65 | 2.51 | 2.18 |
+| 46.57 (110%) | 3668.4 | 39.5 | 17.89 | 99.9 | 1.91 | 2.93 | 2.53 |
 
 **E3 — fill level sweep**
 

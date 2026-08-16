@@ -55,14 +55,17 @@
       </section>
 
       <!-- Bottom Scientific Charts -->
+      <!-- No width/height attributes on the chart canvases: Chart.js sizes the
+           backing store to the wrapper and to devicePixelRatio itself. Fixed
+           attributes plus a CSS stretch is exactly what squashed these plots. -->
       <footer class="charts-drawer">
         <div class="chart-card">
           <h4>Rheology Flow Curve: μ_app(γ̇) & τ(γ̇)</h4>
-          <canvas id="flowCurveCanvas" width="380" height="175"></canvas>
+          <div class="chart-canvas-wrap"><canvas id="flowCurveCanvas"></canvas></div>
         </div>
         <div class="chart-card">
           <h4>Time History: Torque & Kinetic Energy</h4>
-          <canvas id="timeSeriesCanvas" width="380" height="175"></canvas>
+          <div class="chart-canvas-wrap"><canvas id="timeSeriesCanvas"></canvas></div>
         </div>
       </footer>
     </main>

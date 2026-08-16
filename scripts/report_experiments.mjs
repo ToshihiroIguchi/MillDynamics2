@@ -33,9 +33,16 @@ const out = [];
 }
 
 // E2, E3, E4: one-dimensional sweeps
+// Critical speed [rpm] for a summary's own config, so the rpm the solver ran at
+// can be reported alongside the %Nc the sweep was designed in.
+const ncRpm = (cfg) => {
+  const effR = Math.max(0.5 * cfg.D - 0.5 * cfg.dp, 0.01);
+  return (60 / (2 * Math.PI)) * Math.sqrt(cfg.gravity / effR);
+};
+
 const sweep = (prefix, key, keyLabel, fmtKey = String) => {
   const rows = by(prefix).map(s => [
-    fmtKey(s.cfg[key]),
+    fmtKey(s.cfg[key], s),
     f(s.torque, 1), f(s.torqueSd, 1), kw(s.power),
     f(s.yieldedFraction * 100, 1), f(s.meanShearBed, 2), f(s.meanShearFree, 2),
     f(s.maxVel, 2)
@@ -44,7 +51,8 @@ const sweep = (prefix, key, keyLabel, fmtKey = String) => {
 };
 
 out.push('\n**E2 — mill speed sweep**\n');
-out.push(sweep('E2', 'speedFraction', '%Nc'));
+out.push(sweep('E2', 'millRpm', 'speed [rpm] (%Nc)',
+  (v, s) => `${f(v, 2)} (${f((100 * v) / ncRpm(s.cfg), 0)}%)`));
 out.push('\n**E3 — fill level sweep**\n');
 out.push(sweep('E3', 'fillJ', 'J'));
 out.push('\n**E4 — media size sweep**\n');

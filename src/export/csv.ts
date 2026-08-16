@@ -35,6 +35,7 @@ export function generateCsv(cfg: ConfigValues, timeSeries: DataPoint[]): string 
   lines.push(`#   Domain Size L: ${derived.L.toFixed(4)} m`);
   lines.push(`#   Cell Size dx: ${derived.dx_mm.toFixed(3)} mm`);
   lines.push(`#   Critical Speed Nc: ${derived.Nc_rpm.toFixed(2)} rpm (${derived.Nc_rev_s.toFixed(3)} rev/s)`);
+  lines.push(`#   Speed Fraction: ${derived.speedFraction.toFixed(2)} %Nc`);
   lines.push(`#   Angular Velocity omega: ${derived.omega.toFixed(4)} rad/s`);
   lines.push(`#   Tip Speed: ${derived.tipSpeed.toFixed(3)} m/s`);
   lines.push(`#   Permeability K_perm: ${derived.K_perm.toExponential(4)} m^2`);

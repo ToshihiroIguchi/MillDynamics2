@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PARAM_SCHEMA, getDefaultConfig, computeDerived, encodePermalink, decodePermalink } from '../src/config';
+import { PARAM_SCHEMA, getDefaultConfig, computeDerived, encodePermalink, decodePermalink, migrateConfig } from '../src/config';
 import { PRESETS, applyPreset } from '../src/presets';
 import { generateCsv } from '../src/export/csv';
 
@@ -7,7 +7,7 @@ describe('Phase 6 Schema, UI, Presets & Persistence - Row 6a, 6b, 6c', () => {
   it('Row 6a: Schema-walk test - all parameters defined with valid bounds and groups', () => {
     const requiredKeys = [
       'D', 'margin', 'nLifters', 'hLifter', 'wLifter', 'alphaLifter',
-      'speedFraction', 'rotDirection', 'gravity',
+      'millRpm', 'rotDirection', 'gravity',
       'fillJ', 'thetaRepose', 'porosity', 'dp', 'kSlip',
       'rho', 'rheologyMode', 'K', 'n', 'tauY', 'm', 'muMin', 'muMax',
       'A_ergun', 'B_ergun', 'C_gamma', 'closureSource',
@@ -31,6 +31,32 @@ describe('Phase 6 Schema, UI, Presets & Persistence - Row 6a, 6b, 6c', () => {
     const nDef = PARAM_SCHEMA.find(p => p.key === 'N')!;
     expect(nDef.options!.map(o => o.value)).toContain(cfg.N);
     expect(cfg.N).toBe(128);
+
+    // Start-up state (PARAMETERS.md §1, §2, §4): a smooth drum turning at a
+    // round rpm with a 100 cP Newtonian slurry.
+    expect(cfg.nLifters).toBe(0);
+    expect(cfg.millRpm).toBe(30.0);
+    expect(cfg.rheologyMode).toBe('newtonian');
+    expect(cfg.K).toBeCloseTo(0.1, 12); // 0.1 Pa*s = 100 cP
+    expect(cfg.n).toBe(1.0);
+    expect(cfg.tauY).toBe(0.0);
+  });
+
+  it('Row 6a: every parameter is either an everyday control or flagged advanced', () => {
+    // The advanced flag drives the panel split, so a new parameter that belongs
+    // in neither bucket would silently land among the operating controls.
+    const advanced = PARAM_SCHEMA.filter(p => p.advanced).map(p => p.key);
+    for (const key of ['gravity', 'margin', 'kSlip', 'm', 'muMin', 'muMax',
+                       'A_ergun', 'B_ergun', 'C_gamma', 'closureSource',
+                       'cfl', 'maxDt', 'fixedDt', 'nVisc', 'etaPenal', 'advectionScheme',
+                       'N_rve', 'rvePhi', 'rvePacking', 'rveSeed', 'rveFx']) {
+      expect(advanced).toContain(key);
+    }
+    // ...and the everyday controls stay everyday.
+    for (const key of ['D', 'nLifters', 'millRpm', 'rotDirection', 'fillJ',
+                       'porosity', 'dp', 'rho', 'K', 'n', 'tauY', 'N']) {
+      expect(advanced).not.toContain(key);
+    }
   });
 
   it('Row 6a: Derived parameter calculations match analytical formulas', () => {
@@ -47,9 +73,24 @@ describe('Phase 6 Schema, UI, Presets & Persistence - Row 6a, 6b, 6c', () => {
     // Nc = (1/2pi) * sqrt(9.81 / 0.499) = 0.7055 rev/s = 42.33 rpm
     expect(derived.Nc_rpm).toBeCloseTo(42.33, 1);
 
-    // Tip speed at 75% Nc
-    expect(derived.tipSpeed).toBeGreaterThan(1.0);
-    expect(derived.tipSpeed).toBeLessThan(3.0);
+    // Speed is entered in rpm; %Nc is derived from it.
+    expect(derived.speedFraction).toBeCloseTo((30.0 / derived.Nc_rpm) * 100.0, 6);
+    expect(derived.speedFraction).toBeCloseTo(70.9, 1);
+
+    // Tip speed at the default 30 rpm: omega*R = 2*pi*(30/60)*0.5
+    expect(derived.omega).toBeCloseTo(Math.PI, 10);
+    expect(derived.tipSpeed).toBeCloseTo(0.5 * Math.PI, 10);
+  });
+
+  it('Row 6c: a permalink saved when speed was %Nc migrates to rpm', () => {
+    // 75 %Nc of the D = 1 m reference mill is 31.755 rpm.
+    const legacy: any = { version: 1, D: 1.0, dp: 0.002, gravity: 9.81, speedFraction: 75.0 };
+    const migrated = migrateConfig(legacy);
+    expect(migrated.speedFraction).toBeUndefined();
+    expect(migrated.millRpm).toBeCloseTo(31.755, 2);
+
+    const cfg = { ...getDefaultConfig(), ...migrated };
+    expect(computeDerived(cfg).speedFraction).toBeCloseTo(75.0, 6);
   });
 
   it('Row 6b: All presets load valid configs with all fields editable', () => {
@@ -94,7 +135,9 @@ describe('Phase 6 Schema, UI, Presets & Persistence - Row 6a, 6b, 6c', () => {
     const csv = generateCsv(cfg, timeSeries);
     expect(csv).toContain('# Parameter Metadata Block:');
     expect(csv).toContain('#   D (Mill Diameter): 1 m');
-    expect(csv).toContain('#   K (Consistency Index (K)): 0.5 Pa·sⁿ');
+    expect(csv).toContain('#   millRpm (Mill Speed): 30 rpm');
+    expect(csv).toContain('#   K (Viscosity / Consistency (K)): 0.1 Pa·sⁿ');
+    expect(csv).toMatch(/#   Speed Fraction: 70\.8\d %Nc/);
     expect(csv).toContain('time_s,dt_s,torque_Nm_m,power_W_m,mean_shear_bed_s1');
     expect(csv).toContain('0.1000,2.0000e-3,50.500,120.000');
   });

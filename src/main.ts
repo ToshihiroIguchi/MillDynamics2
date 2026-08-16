@@ -2,11 +2,11 @@
 // Main application entry point orchestrating WebAssembly solver, UI, and rendering
 
 import './style.css';
-import { ConfigValues, getDefaultConfig, computeDerived, encodePermalink, decodePermalink } from './config';
+import { ConfigValues, getDefaultConfig, computeDerived, encodePermalink, decodePermalink, migrateConfig } from './config';
 import { applyPreset, PRESETS } from './presets';
 import { FieldRenderer, RenderOptions, FieldType } from './render/field';
 import { ColormapName } from './render/colormap';
-import { FlowCurvePlot } from './ui/flowcurve';
+import { FlowCurveChart, TimeSeriesChart } from './ui/charts';
 import { renderAboutModal } from './ui/about';
 import { renderControlPanel, updateDerivedReadouts } from './ui/panel';
 import { generateCsv, downloadCsv, DataPoint } from './export/csv';
@@ -21,10 +21,11 @@ class App {
   cfg: ConfigValues = getDefaultConfig();
   isRunning: boolean = true;
   fieldRenderer!: FieldRenderer;
-  flowCurvePlot!: FlowCurvePlot;
+  flowCurveChart!: FlowCurveChart;
+  timeSeriesChart!: TimeSeriesChart;
 
   currentAngle: number = 0.0;
-  activePreset: string = 'baseline';
+  activePreset: string = 'default';
   timeSeries: DataPoint[] = [];
   timeSeriesStride: number = 1;
   frameCounter: number = 0;
@@ -78,11 +79,13 @@ class App {
     // undefined and feed NaN straight into the solver.
     const hashCfg = decodePermalink(window.location.hash);
     if (hashCfg) {
-      this.cfg = { ...getDefaultConfig(), ...hashCfg };
+      // migrateConfig first: a link saved when the speed control was %Nc must
+      // reproduce its own run, not inherit the default rpm.
+      this.cfg = { ...getDefaultConfig(), ...migrateConfig(hashCfg) };
       this.activePreset = '';
     } else {
-      this.cfg = applyPreset('baseline');
-      this.activePreset = 'baseline';
+      this.cfg = applyPreset('default');
+      this.activePreset = 'default';
     }
 
     // 3. Setup Renderers
@@ -90,7 +93,9 @@ class App {
     this.fieldRenderer = new FieldRenderer(simCanvas);
 
     const flowCurveCanvas = document.getElementById('flowCurveCanvas') as HTMLCanvasElement;
-    this.flowCurvePlot = new FlowCurvePlot(flowCurveCanvas);
+    this.flowCurveChart = new FlowCurveChart(flowCurveCanvas);
+    const timeSeriesCanvas = document.getElementById('timeSeriesCanvas') as HTMLCanvasElement;
+    this.timeSeriesChart = new TimeSeriesChart(timeSeriesCanvas);
 
     // 4. Setup Modal and Sidebar UI
     const modalContainer = document.getElementById('modalContainer');
@@ -155,6 +160,9 @@ class App {
     this.timeSeries = [];
     this.timeSeriesStride = 1;
     this.frameCounter = 0;
+    // Drop the trace from the previous configuration rather than letting it hang
+    // on the chart until the next UI tick.
+    this.timeSeriesChart?.reset();
   }
 
   // CFL, max dt and the advection scheme are in PARAM_SCHEMA and have always
@@ -271,7 +279,12 @@ class App {
     // Presets 2-9 are deltas on top of the current config, so a preset applied
     // after another preset inherits whatever the previous one changed. Rebase on
     // the baseline first so each preset is reproducible from a cold start.
-    const base = presetId === 'baseline' ? getDefaultConfig() : applyPreset('baseline');
+    // Presets 0 and 1 are complete configurations and rebase on the schema
+    // defaults instead.
+    const base =
+      presetId === 'baseline' || presetId === 'default'
+        ? getDefaultConfig()
+        : applyPreset('baseline');
     this.cfg = applyPreset(presetId, base);
     this.activePreset = presetId;
     this.mountControlPanel();
@@ -462,8 +475,8 @@ class App {
       // measurable share of the frame budget on its own.
       if (now - this.lastUiUpdate > UI_UPDATE_MS) {
         this.lastUiUpdate = now;
-        this.flowCurvePlot.renderIfChanged(this.cfg, meanShearBed);
-        this.renderTimeSeriesChart();
+        this.flowCurveChart.updateIfChanged(this.cfg, meanShearBed);
+        this.timeSeriesChart.update(this.timeSeries);
         const sidebar = document.getElementById('sidebarPanel');
         if (sidebar) {
           updateDerivedReadouts(sidebar, this.cfg, {
@@ -488,115 +501,6 @@ class App {
       (this.isRunning ? 'running' : 'paused');
   }
 
-  renderTimeSeriesChart(): void {
-    const canvas = document.getElementById('timeSeriesCanvas') as HTMLCanvasElement;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const w = canvas.width;
-    const h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
-
-    const pts = this.timeSeries;
-    if (pts.length < 2) {
-      ctx.fillStyle = '#64748b';
-      ctx.font = '11px system-ui';
-      ctx.textAlign = 'center';
-      ctx.fillText('Running simulation...', w / 2, h / 2);
-      return;
-    }
-
-    const padLeft = 52;
-    const padRight = 52;
-    const padTop = 18;
-    const padBottom = 26;
-    const plotW = w - padLeft - padRight;
-    const plotH = h - padTop - padBottom;
-
-    // Time extent
-    const tMin = pts[0].time;
-    const tMax = pts[pts.length - 1].time;
-    const dtTotal = Math.max(tMax - tMin, 1e-6);
-
-    // Percentile extents, not min/max. Starting a mill from rest is an impulsive
-    // problem: the first few samples carry a torque spike orders of magnitude
-    // above the working value, and scaling to it flattened the rest of the trace
-    // into a straight line along the axis.
-    const extent = (pick: (p: DataPoint) => number) => {
-      const vals = pts.map(pick).filter(Number.isFinite).sort((a, b) => a - b);
-      if (vals.length === 0) return { lo: 0, hi: 1 };
-      let lo = vals[Math.floor(0.02 * (vals.length - 1))];
-      let hi = vals[Math.ceil(0.98 * (vals.length - 1))];
-      if (hi - lo < 1e-12 * Math.max(1, Math.abs(hi))) {
-        hi = lo + Math.max(1, Math.abs(lo) * 0.1);
-      }
-      // Pad by 6% so the trace does not ride the frame.
-      const pad = 0.06 * (hi - lo);
-      return { lo: lo - pad, hi: hi + pad };
-    };
-
-    const tq = extent(p => p.torque);
-    const ke = extent(p => p.kineticEnergy);
-
-    // Frame
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    ctx.moveTo(padLeft, padTop);
-    ctx.lineTo(padLeft, padTop + plotH);
-    ctx.lineTo(padLeft + plotW, padTop + plotH);
-    ctx.lineTo(padLeft + plotW, padTop);
-    ctx.stroke();
-
-    const fmt = (val: number): string => {
-      const a = Math.abs(val);
-      if (a >= 1e4 || (a > 0 && a < 1e-2)) return val.toExponential(1);
-      return val.toFixed(a < 10 ? 2 : 0);
-    };
-
-    ctx.font = '9px system-ui, sans-serif';
-
-    // Left axis: torque
-    ctx.fillStyle = '#38bdf8';
-    ctx.textAlign = 'right';
-    ctx.fillText(fmt(tq.hi), padLeft - 4, padTop + 8);
-    ctx.fillText(fmt(tq.lo), padLeft - 4, padTop + plotH);
-    ctx.fillText('T [N·m/m]', padLeft - 4, padTop - 6);
-
-    // Right axis: kinetic energy
-    ctx.fillStyle = '#a3e635';
-    ctx.textAlign = 'left';
-    ctx.fillText(fmt(ke.hi), padLeft + plotW + 4, padTop + 8);
-    ctx.fillText(fmt(ke.lo), padLeft + plotW + 4, padTop + plotH);
-    ctx.fillText('KE [J/m]', padLeft + plotW + 4, padTop - 6);
-
-    ctx.fillStyle = '#94a3b8';
-    ctx.textAlign = 'center';
-    ctx.fillText(`t = ${tMin.toFixed(2)} … ${tMax.toFixed(2)} s`, padLeft + plotW / 2, padTop + plotH + 16);
-
-    const series = (pick: (p: DataPoint) => number, ex: { lo: number; hi: number }, colour: string) => {
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(padLeft, padTop, plotW, plotH);
-      ctx.clip(); // percentile scaling means outliers can fall outside the frame
-      ctx.strokeStyle = colour;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      for (let i = 0; i < pts.length; i++) {
-        const px = padLeft + ((pts[i].time - tMin) / dtTotal) * plotW;
-        const py = padTop + plotH - ((pick(pts[i]) - ex.lo) / (ex.hi - ex.lo)) * plotH;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-      ctx.restore();
-    };
-
-    series(p => p.torque, tq, '#38bdf8');
-    // The kinetic energy trace the chart title has always advertised.
-    series(p => p.kineticEnergy, ke, '#a3e635');
-  }
 }
 
 // Bootstrap on DOM loaded

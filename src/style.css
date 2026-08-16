@@ -144,7 +144,9 @@ html, body {
 
 .charts-drawer {
   flex: 0 0 auto;
-  height: clamp(160px, 24vh, 240px);
+  /* Log-log axes with two y-scales and a legend need vertical room; at the old
+     160 px floor the plot area itself was under 100 px tall. */
+  height: clamp(210px, 27vh, 300px);
   background-color: var(--bg-card);
   border-top: 1px solid var(--border-color);
   display: grid;
@@ -172,10 +174,22 @@ html, body {
   flex: 0 0 auto;
 }
 
-.chart-card canvas {
+/* Chart.js measures its parent, so the canvas gets a positioned box of its own
+   with a real height. The canvas is absolutely positioned inside it: otherwise
+   the canvas's own size feeds back into the flex height and the chart grows a
+   few pixels on every resize. */
+.chart-canvas-wrap {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
+}
+
+.chart-canvas-wrap canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 /* Right: Control Sidebar */
@@ -281,6 +295,40 @@ html, body {
   gap: 10px;
 }
 
+/* Advanced / special parameters — visually set apart from the operating set. */
+.advanced-group {
+  border-color: #475569;
+  border-style: dashed;
+}
+
+.advanced-group > .group-title {
+  background-color: #232b3d;
+  color: var(--text-muted);
+}
+
+.advanced-note {
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+  border-left: 2px solid var(--border-color);
+  padding-left: 8px;
+}
+
+.advanced-subtitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent-cyan);
+  margin-top: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.advanced-subtitle:first-of-type {
+  margin-top: 0;
+}
+
 .param-item {
   display: flex;
   flex-direction: column;
@@ -304,7 +352,8 @@ html, body {
 
 .range-input-pair {
   display: grid;
-  grid-template-columns: 1fr 75px;
+  /* 88px, not 75px: 1e-4 clamps rendered as a truncated "0.000" at the old width. */
+  grid-template-columns: 1fr 88px;
   gap: 8px;
   align-items: center;
 }

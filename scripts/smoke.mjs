@@ -5,7 +5,13 @@ import path from 'path';
 import { chromium } from '@playwright/test';
 
 const distDir = path.resolve('dist');
-const port = 4173;
+// 4173 is vite's default preview port, so any other project previewing on this
+// machine already owns it. Bind and browse 127.0.0.1 explicitly (not "localhost",
+// which Chromium resolves to ::1 first — a foreign server listening on [::1]:4173
+// silently served its own page here and the wait for __MILL_APP__ timed out), and
+// let SMOKE_PORT move the test out of the way entirely.
+const host = '127.0.0.1';
+const port = Number(process.env.SMOKE_PORT) || 4173;
 
 // Simple static file server for dist/
 function startServer() {
@@ -40,8 +46,8 @@ function startServer() {
   });
 
   return new Promise((resolve) => {
-    server.listen(port, () => {
-      console.log(`Smoke server listening on http://localhost:${port}`);
+    server.listen(port, host, () => {
+      console.log(`Smoke server listening on http://${host}:${port}`);
       resolve(server);
     });
   });
@@ -74,8 +80,8 @@ async function runSmokeTest() {
   });
 
   try {
-    console.log('Navigating to http://localhost:' + port);
-    await page.goto(`http://localhost:${port}/`, { waitUntil: 'networkidle' });
+    console.log(`Navigating to http://${host}:${port}`);
+    await page.goto(`http://${host}:${port}/`, { waitUntil: 'networkidle' });
 
     // Wait for WASM instantiation
     await page.waitForFunction(() => window.__MILL_APP__ && window.__MILL_APP__.wasm !== null, { timeout: 10000 });
