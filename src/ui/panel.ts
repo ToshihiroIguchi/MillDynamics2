@@ -167,6 +167,9 @@ export function renderControlPanel(
     <div class="readouts-section">
       <h3>Derived Parameters & Diagnostics</h3>
       <div id="derivedGrid" class="readouts-grid"></div>
+      <p class="readouts-footnote" style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem; line-height: 1.3;">
+        * Absolute torque and power draw are mesh- and time-step-dependent (see docs/VALIDATION.md §3.2, §6.4).
+      </p>
     </div>
   `;
 
@@ -270,8 +273,8 @@ export function updateDerivedReadouts(container: HTMLElement, cfg: ConfigValues,
     ['Permeability (K)', `${derived.K_perm.toExponential(2)} m²`],
     ['Pore Shear Rate', `${derived.gammaPore.toFixed(0)} s⁻¹`],
     ['Sim Time (t)', `${(diag.simTime || 0).toFixed(3)} s`],
-    ['Shell Torque (T)', `${(diag.torque || 0).toFixed(1)} N·m/m`],
-    ['Power Draw (P)', `${((diag.torque || 0) * Math.abs(derived.omega) / 1000.0).toFixed(2)} kW/m`],
+    ['Shell Torque (T)*', `${(diag.torque || 0).toFixed(1)} N·m/m`],
+    ['Power Draw (P)*', `${((diag.torque || 0) * Math.abs(derived.omega) / 1000.0).toFixed(2)} kW/m`],
     ['Max Velocity', `${(diag.maxVel || 0).toFixed(2)} m/s`],
     ['Kinetic Energy', `${(diag.kineticEnergy || 0).toFixed(0)} J/m`],
     ['Bed Mean γ̇', `${(diag.meanShearBed || 0).toFixed(1)} s⁻¹`],

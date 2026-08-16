@@ -29,6 +29,8 @@ export interface RenderOptions {
 
 // Fraction of the canvas width reserved on the right for the colour bar.
 const COLORBAR_GUTTER = 0.17;
+const LOG_FLOOR = 1e-4;
+const FIELD_UNIFORM_TOL = 1e-7;
 
 // Percentile-clipped range over the first `n` entries of `buf`.
 // Sorts `buf` in place (it is scratch storage owned by the renderer).
@@ -62,7 +64,9 @@ export class FieldRenderer {
     if (!ctx) throw new Error('Could not get 2D canvas context');
     this.ctx = ctx;
 
-    this.offscreenCanvas = document.createElement('canvas');
+    this.offscreenCanvas = (typeof document !== 'undefined' && typeof document.createElement === 'function')
+      ? document.createElement('canvas')
+      : canvas;
     const offCtx = this.offscreenCanvas.getContext('2d');
     if (!offCtx) throw new Error('Could not get offscreen canvas context');
     this.offscreenCtx = offCtx;
@@ -125,8 +129,6 @@ export class FieldRenderer {
           val = p[c];
         } else if (field === 'yieldState') {
           // Yielded where the local shear stress exceeds the yield stress.
-          // The old test (gammaDot > 1/m) marked essentially the whole domain
-          // as yielded for any m >= 10.
           const tauY = <number>cfg.tauY;
           val = (tauY <= 0.0 || mu[c] * gammaDot[c] > tauY) ? 1.0 : 0.0;
         } else if (field === 'vorticity') {
@@ -145,25 +147,36 @@ export class FieldRenderer {
       }
     }
 
-    // Robust colour limits. Scaling to the raw min/max let a handful of cells
-    // at a stagnation point (mu -> muMax) or a single grid-scale spike consume
-    // the whole colour range, which is why the field read as one flat colour
-    // with a few bright dots. Percentiles keep the bulk of the field readable.
+    // Robust colour limits using percentiles over fluid cells
     let { min: minVal, max: maxVal } = percentileRange(this.sortScratch!, nFluid, 0.02, 0.98);
 
-    if (!Number.isFinite(minVal) || !Number.isFinite(maxVal) || minVal >= maxVal) {
-      minVal = 0.0;
-      maxVal = 1.0;
-    }
+    const isNonFinite = !Number.isFinite(minVal) || !Number.isFinite(maxVal);
+    const span = maxVal - minVal;
+    const isUniform = nFluid === 0 || isNonFinite || (span <= FIELD_UNIFORM_TOL * Math.max(1.0, Math.abs(maxVal)));
+    const uniformVal = Number.isFinite(minVal) ? minVal : 0.0;
+
     if (field === 'yieldState' || field === 'chiBed') {
-      minVal = 0.0;
-      maxVal = 1.0;
+      if (!isUniform) {
+        minVal = 0.0;
+        maxVal = 1.0;
+      }
     }
 
     const logScale = (field === 'mu' || field === 'gammaDot');
-    const logMin = logScale ? Math.log10(Math.max(minVal, 1e-4)) : minVal;
-    const logMax = logScale ? Math.log10(Math.max(maxVal, 1e-3)) : maxVal;
-    const range = (logMax > logMin) ? (logMax - logMin) : 1.0;
+    const clampedMin = Math.max(minVal, LOG_FLOOR);
+    const clampedMax = Math.max(maxVal, LOG_FLOOR);
+    const logMin = logScale ? Math.log10(clampedMin) : minVal;
+    const logMax = logScale ? Math.log10(clampedMax) : maxVal;
+    const logRange = (logMax > logMin) ? (logMax - logMin) : 1.0;
+    const linRange = (maxVal > minVal) ? (maxVal - minVal) : 1.0;
+
+    // Check if vorticity truly changes sign across fluid cells
+    const hasBothSigns = (field === 'vorticity') && (minVal < -1e-4 && maxVal > 1e-4);
+    const maxAbsVort = Math.max(Math.abs(minVal), Math.abs(maxVal), 1e-4);
+
+    const activeCmap: ColormapName = (field === 'yieldState') ? 'yieldState'
+      : (field === 'vorticity' && hasBothSigns) ? 'coolwarm'
+      : opts.colormap;
 
     // 2. Map scalars to pixel colors in offscreen buffer (Y inverted for screen coordinates)
     for (let j = 0; j < N; j++) {
@@ -172,11 +185,6 @@ export class FieldRenderer {
         const c = i + j * N;
         const pxIdx = (i + screenY * N) * 4;
 
-        // Mask anything that is more solid than fluid. The old 0.95 threshold
-        // left the penalization transition band coloured, and because the fluid
-        // there is pinned to the rigid-body wall velocity its shear rate is ~0,
-        // so mu -> mu_max and the shell was ringed by a bright halo that looked
-        // like a physical high-viscosity layer.
         if (chi[c] > 0.5) {
           buf[pxIdx + 0] = 30;
           buf[pxIdx + 1] = 34;
@@ -186,19 +194,23 @@ export class FieldRenderer {
         }
 
         const val = scalar[c];
-        let normVal = 0.0;
-        if (logScale) {
-          const lVal = Math.log10(Math.max(val, 1e-4));
-          normVal = (lVal - logMin) / range;
-        } else if (field === 'vorticity') {
-          // Diverging: zero in center
-          const maxAbs = Math.max(Math.abs(minVal), Math.abs(maxVal), 1e-4);
-          normVal = 0.5 + 0.5 * (val / maxAbs);
+        let normVal = 0.5;
+
+        if (isUniform) {
+          normVal = 0.5;
+        } else if (logScale) {
+          const clampedVal = Math.max(val, LOG_FLOOR);
+          const lVal = Math.log10(clampedVal);
+          normVal = (lVal - logMin) / logRange;
+        } else if (field === 'vorticity' && hasBothSigns) {
+          normVal = 0.5 + 0.5 * (val / maxAbsVort);
         } else {
-          normVal = (val - minVal) / range;
+          normVal = (val - minVal) / linRange;
         }
 
-        const [r, g, b] = mapScalarToRgb(normVal, (field === 'vorticity' ? 'coolwarm' : (field === 'yieldState' ? 'yieldState' : opts.colormap)));
+        normVal = Math.max(0.0, Math.min(1.0, normVal));
+
+        const [r, g, b] = mapScalarToRgb(normVal, activeCmap);
         buf[pxIdx + 0] = r;
         buf[pxIdx + 1] = g;
         buf[pxIdx + 2] = b;
@@ -368,14 +380,15 @@ export class FieldRenderer {
     }
 
     // E. Colour bar — without it none of the field views carry a scale.
-    this.drawColorbar(minVal, maxVal, logScale, field, opts);
+    this.drawColorbar(minVal, maxVal, isUniform, uniformVal, logScale, hasBothSigns, activeCmap, field);
 
-    return { min: minVal, max: maxVal };
+    return isUniform ? { min: uniformVal, max: uniformVal } : { min: minVal, max: maxVal };
   }
 
   private drawColorbar(
-    minVal: number, maxVal: number, logScale: boolean,
-    field: FieldType, opts: RenderOptions
+    minVal: number, maxVal: number, isUniform: boolean, uniformVal: number,
+    logScale: boolean, hasBothSigns: boolean,
+    activeCmap: ColormapName, field: FieldType
   ): void {
     const ctx = this.ctx;
     const cw = this.canvas.width;
@@ -388,14 +401,10 @@ export class FieldRenderer {
     const x0 = cw - gutter + Math.round(gutter * 0.10);
     const y0 = Math.round((chh - barH) * 0.5);
 
-    const cmap = field === 'vorticity' ? 'coolwarm'
-      : field === 'yieldState' ? 'yieldState'
-      : opts.colormap;
-
     ctx.save();
     for (let k = 0; k < barH; k++) {
       const t = 1.0 - k / (barH - 1);
-      const [r, g, b] = mapScalarToRgb(t, cmap);
+      const [r, g, b] = mapScalarToRgb(t, activeCmap);
       ctx.fillStyle = `rgb(${r},${g},${b})`;
       ctx.fillRect(x0, y0 + k, barW, 1);
     }
@@ -406,30 +415,44 @@ export class FieldRenderer {
     const fmt = (val: number): string => {
       if (!Number.isFinite(val)) return '—';
       const a = Math.abs(val);
-      if (a !== 0 && (a < 1e-2 || a >= 1e4)) return val.toExponential(1);
+      if (a === 0) return '0.00';
+      if (a < 1e-2 || a >= 1e4) return val.toExponential(1);
       return val.toFixed(a < 1 ? 3 : 2);
     };
-
-    let lo = minVal;
-    let hi = maxVal;
-    if (field === 'vorticity') {
-      const m = Math.max(Math.abs(minVal), Math.abs(maxVal));
-      lo = -m;
-      hi = m;
-    }
 
     ctx.fillStyle = 'rgba(226, 232, 240, 0.9)';
     ctx.font = `${Math.max(9, Math.round(cw * 0.021))}px system-ui, sans-serif`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(fmt(hi), x0 + barW + 5, y0 + 4);
-    ctx.fillText(fmt(0.5 * (lo + hi)), x0 + barW + 5, y0 + barH * 0.5);
-    ctx.fillText(fmt(lo), x0 + barW + 5, y0 + barH - 4);
+
+    if (isUniform) {
+      // 9.1: When field is uniform, label the single actual value at the midpoint
+      ctx.fillText(`${fmt(uniformVal)} (uniform)`, x0 + barW + 5, y0 + barH * 0.5);
+    } else if (logScale) {
+      // 9.2: Log scales use geometric mean at midpoint and actual clamped bounds
+      const lo = Math.max(minVal, LOG_FLOOR);
+      const hi = Math.max(maxVal, LOG_FLOOR);
+      const mid = Math.sqrt(lo * hi);
+      ctx.fillText(fmt(hi), x0 + barW + 5, y0 + 4);
+      ctx.fillText(fmt(mid), x0 + barW + 5, y0 + barH * 0.5);
+      ctx.fillText(fmt(lo), x0 + barW + 5, y0 + barH - 4);
+    } else if (field === 'vorticity' && hasBothSigns) {
+      // 9.4: Diverging zero-centered for two-signed vorticity
+      const m = Math.max(Math.abs(minVal), Math.abs(maxVal));
+      ctx.fillText(fmt(m), x0 + barW + 5, y0 + 4);
+      ctx.fillText('0.00', x0 + barW + 5, y0 + barH * 0.5);
+      ctx.fillText(fmt(-m), x0 + barW + 5, y0 + barH - 4);
+    } else {
+      // Standard linear scaling
+      ctx.fillText(fmt(maxVal), x0 + barW + 5, y0 + 4);
+      ctx.fillText(fmt(0.5 * (minVal + maxVal)), x0 + barW + 5, y0 + barH * 0.5);
+      ctx.fillText(fmt(minVal), x0 + barW + 5, y0 + barH - 4);
+    }
 
     ctx.textAlign = 'left';
     ctx.fillStyle = 'rgba(148, 163, 184, 0.95)';
     ctx.fillText(FIELD_UNITS[field], x0, y0 - 22);
-    if (logScale) ctx.fillText('(log scale)', x0, y0 - 10);
+    if (logScale && !isUniform) ctx.fillText('(log scale)', x0, y0 - 10);
     ctx.restore();
   }
 }

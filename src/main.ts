@@ -34,7 +34,7 @@ class App {
   lastUiUpdate: number = 0;
 
   renderOpts: RenderOptions = {
-    fieldType: 'mu',
+    fieldType: 'speed',
     colormap: 'viridis',
     showShell: true,
     showLifters: true,

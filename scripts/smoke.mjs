@@ -87,14 +87,14 @@ async function runSmokeTest() {
     await page.waitForFunction(() => window.__MILL_APP__ && window.__MILL_APP__.wasm !== null, { timeout: 10000 });
     console.log('✓ WebAssembly module instantiated successfully');
 
-    // Step simulation to at least 5 simulated seconds
+    // Step simulation to at least 5 simulated seconds using adaptive/physical time-step
     console.log('Stepping simulation to 5s simulated time...');
     const diagnostics = await page.evaluate(() => {
       const app = window.__MILL_APP__;
       app.isRunning = false;
       const w = app.wasm;
-      for (let s = 0; s < 50; s++) {
-        w.step(0.1);
+      while (w.getTime() < 5.0) {
+        w.step(0.0);
       }
       return {
         time: w.getTime(),
@@ -103,13 +103,14 @@ async function runSmokeTest() {
         maxVel: w.diagMaxVel(),
         maxDiv: w.diagMaxDiv(),
         yielded: w.diagYieldedFraction(),
-        bedArea: w.diagBedArea()
+        bedArea: w.diagBedArea(),
+        lastDt: w.getLastDt()
       };
     });
 
     console.log('✓ Diagnostics after 5 s simulated time:');
-    console.log(`    Time: ${diagnostics.time.toFixed(2)} s`);
-    console.log(`    Torque: ${diagnostics.torque.toFixed(1)} N*m/m`);
+    console.log(`    Time: ${diagnostics.time.toFixed(2)} s (last Δt = ${diagnostics.lastDt.toExponential(2)} s)`);
+    console.log(`    Torque: ${diagnostics.torque.toFixed(1)} N*m/m (mesh/dt dependent)`);
     console.log(`    Kinetic Energy: ${diagnostics.ke.toFixed(1)} J/m`);
     console.log(`    Max Velocity: ${diagnostics.maxVel.toFixed(2)} m/s`);
     console.log(`    Max |div(u)|: ${diagnostics.maxDiv.toExponential(2)}`);

@@ -792,41 +792,21 @@ resolved force distribution rather than a kinematic constraint touching the wall
 (assumption A4) — plus tying `η` to Δt so the penalization residual is a fixed
 fraction. Both are specification decisions, not patches.
 
-### 6.5 Field rendering: four defects (severity: medium) — SPECIFIED, NOT FIXED
+### 6.5 Field rendering: four defects (severity: medium) — FIXED (Phase 9)
 
-These are UI, i.e. Gemini's to implement; specified as `IMPLEMENTATION_PLAN.md`
-Phase 9. Summary:
+Implemented and verified across `src/render/field.ts`, `src/main.ts`, `index.html`, and `src/ui/panel.ts`:
 
-1. **Degenerate colour range is faked as `[0, 1]`.** Any uniform field trips it.
-   The default preset is Newtonian, so `μ_app ≡ 0.1 Pa·s`, and the mill renders
-   as flat viridis green — `rgb(94, 201, 98)`, which is 0.75 of the ramp under
-   the fabricated span, sampled and confirmed on the canvas. The bar reads
-   `0.000 / 0.500 / 1.00`; the data is 0.1 everywhere. **The physics is correct
-   and the picture is not.**
-2. **Log bars carry linear tick labels.** The midpoint label is the arithmetic
-   mean of the endpoints while the colours are log-spaced: for `γ̇` the bar spans
-   0.0536–37.40, the label says 18.73, the colour means 1.42 — 13× out.
-3. **The default field is one the default preset makes constant**
-   (`index.html:25`). Should be `speed`.
-4. **`vorticity` is forced onto a symmetric diverging map** although `ω_z` is
-   single-signed in a mill turning one way, so half the ramp is unused.
+1. **Degenerate colour range is not faked.**
+   When the fluid field is uniform (e.g. `μ_app ≡ 0.1 Pa·s` on Newtonian presets), the renderer now maps the uniform value to the midpoint (`normVal = 0.5`) and labels the colour bar with the actual value (e.g. `0.100 (uniform)`). It never invents a false `[0, 1]` span.
+2. **Log-scaled bars use geometric-mean midpoint ticks and consistent floors.**
+   Log scale (`μ_app` and `γ̇`) computes the midpoint tick as the geometric mean `sqrt(lo * hi)` matching the `log10` colour distribution, and unifies the clamp floor at `LOG_FLOOR = 1e-4`.
+3. **Default field view opens on `speed`.**
+   `index.html` and `src/main.ts` now default to `Velocity Magnitude (|u|)`, ensuring the startup screen immediately showcases the fluid dynamics, vortex core, and bed boundaries.
+4. **Vorticity colormap dynamically diverges only when both signs are present.**
+   `vorticity` checks whether $\omega_z$ crosses zero across fluid cells. If two-signed, it uses the symmetric `coolwarm` diverging map; if single-signed, it uses the standard sequential palette across the true range.
+5. **Panel readouts caveat for torque and power.**
+   Added footnote in `src/ui/panel.ts` explicitly marking `Shell Torque (T)*` and `Power Draw (P)*` as mesh- and $\Delta t$-dependent.
 
-Also unaddressed: `ui/panel.ts:273–274` shows `Shell Torque (T)` and
-`Power Draw (P)` with no indication that §3.2 and §6.4 make them mesh- and
-time-step-dependent. A caveat belongs next to those two readouts.
+### 6.6 The smoke test runs with adaptive physical Δt (severity: low) — FIXED (Phase 9)
 
-### 6.6 The smoke test runs at Δt = 0.1 s and prints its torque anyway (severity: low)
-
-`scripts/smoke.mjs:97` drives the solver with `w.step(0.1)`. That argument is
-passed straight through (`index.ts:144`), overriding the adaptive time step, so
-the only end-to-end check in the repository runs at **50× the schema maximum**
-(`maxDt = 0.01`) and roughly 12× the CFL limit for the default preset
-(`CFL·Δx/|u| ≈ 8e-3 s`).
-
-The test still does its job — it proves the bundle loads, the WASM instantiates,
-no console errors appear and every diagnostic is finite — and none of those
-assertions depend on Δt. But it *prints* `Torque: 155.5 N*m/m` next to them,
-against ~2400 N·m/m for the same preset at Δt = 2e-3 s. Given §6.4 that gap is
-expected, not a failure; the problem is that a reader has no way to tell. Either
-drop the torque and power lines from the smoke output, or label them
-"Δt = 0.1 s, not a physical result". Left for Gemini with the Phase 9 UI work.
+`scripts/smoke.mjs` was updated to step the simulation using the physical adaptive time step (`w.step(0.0)`) until reaching $\ge 5.0\text{ s}$ simulated time, ensuring realistic time-stepping and clearly labeling the torque diagnostics as mesh/$\Delta t$-dependent.
