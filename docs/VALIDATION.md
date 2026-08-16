@@ -161,12 +161,14 @@ Method, and it applies to every table below:
   E4 are still *designed* in %`N_c` and convert with `rpmFromSpeedFraction`;
   because `N_c` depends on `d_p`, E4 takes the conversion after setting `d_p`, so
   that sweep continues to hold 75 %`N_c` rather than a fixed shell rpm.
-- **All 52 runs were re-executed through the new config path on 2026-08-16** and
-  agree with the figures already published here to within `1.5e-4` relative (the
-  round-trip %`N_c` → rpm → ω is not bit-exact). `results/SUMMARY.md` regenerates
-  character-for-character identical apart from the E2 speed column, now labelled
-  in rpm, and the E2 40 %`N_c` yielded fraction, which rounds to 99.5 % instead of
-  99.6 %. That one digit is corrected in the table below; nothing else moved.
+- **All 52 runs were re-executed on 2026-08-16 after the gravity fix of §6.1**,
+  which is the source of the numbers below. Gravity had been applied `1/ρ` too
+  weak, so every earlier figure in this section was effectively a `g = 0` run.
+  Restoring it raised the torque level by ~1 %: the reference case moved from
+  2466.2 to 2492.3 N·m/m and E5's `N = 512` from 665.9 to 673.9. **No trend, sign
+  or conclusion in §3.2–§3.6 changed** — the shift is nearly uniform across the
+  sweeps, which is expected, because in a flooded constant-density single-phase
+  mill gravity is a pure gradient and is dynamically almost inert (§6.1).
 - Fixed `Δt = 2e-3 s`, run to `t = 3 s`, **all quantities are means over the
   1.5–3 s window** with the standard deviation over that window quoted, plus a
   drift check between the two halves of the window. The reference case settles by
@@ -180,65 +182,65 @@ Method, and it applies to every table below:
 
 | n \ tau_y | 0 | 5 | 20 | 50 |
 | --- | --- | --- | --- | --- |
-| 0.4 | 6.23 | 6.34 | 6.56 | 6.80 |
-| 0.6 | 7.28 | 7.33 | 7.39 | 7.44 |
-| 0.8 | 9.27 | 9.25 | 9.15 | 8.97 |
-| 1 | 11.59 | 11.52 | 11.29 | 10.93 |
-| 1.2 | 14.02 | 13.97 | 13.61 | 13.08 |
+| 0.4 | 6.31 | 6.42 | 6.64 | 6.87 |
+| 0.6 | 7.36 | 7.40 | 7.47 | 7.52 |
+| 0.8 | 9.37 | 9.35 | 9.26 | 9.07 |
+| 1 | 11.75 | 11.68 | 11.45 | 11.09 |
+| 1.2 | 14.23 | 14.18 | 13.83 | 13.30 |
 
 **E1 — yielded area fraction [%]**
 
 | n \ tau_y | 0 | 5 | 20 | 50 |
 | --- | --- | --- | --- | --- |
-| 0.4 | 100.0 | 99.8 | 97.4 | 92.2 |
-| 0.6 | 100.0 | 99.8 | 97.4 | 92.2 |
-| 0.8 | 100.0 | 99.7 | 97.4 | 92.1 |
-| 1 | 100.0 | 99.6 | 97.2 | 92.0 |
-| 1.2 | 100.0 | 99.5 | 97.3 | 91.9 |
+| 0.4 | 100.0 | 99.8 | 97.0 | 91.9 |
+| 0.6 | 100.0 | 99.8 | 97.1 | 91.8 |
+| 0.8 | 100.0 | 99.7 | 97.0 | 91.6 |
+| 1 | 100.0 | 99.6 | 96.9 | 91.3 |
+| 1.2 | 100.0 | 99.5 | 96.9 | 91.1 |
 
 **E2 — mill speed sweep**
 
 | speed [rpm] (%Nc) | T [N·m/m] | ±sd | P [kW/m] | yielded [%] | bed γ̇ [1/s] | free γ̇ [1/s] | max|u| [m/s] |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 16.94 (40%) | 1309.1 | 15.3 | 2.32 | 99.5 | 0.70 | 1.31 | 0.92 |
-| 23.29 (55%) | 1797.3 | 19.9 | 4.38 | 99.6 | 0.95 | 1.51 | 1.26 |
-| 27.52 (65%) | 2129.0 | 23.4 | 6.14 | 99.7 | 1.13 | 1.71 | 1.49 |
-| 31.76 (75%) | 2466.2 | 27.4 | 8.20 | 99.7 | 1.30 | 1.95 | 1.72 |
-| 35.99 (85%) | 2804.1 | 30.8 | 10.57 | 99.8 | 1.47 | 2.23 | 1.95 |
-| 40.22 (95%) | 3145.3 | 33.8 | 13.25 | 99.8 | 1.65 | 2.51 | 2.18 |
-| 46.57 (110%) | 3668.4 | 39.5 | 17.89 | 99.9 | 1.91 | 2.93 | 2.53 |
+| 16.94 (40%) | 1334.3 | 14.9 | 2.37 | 99.6 | 0.70 | 1.20 | 0.93 |
+| 23.29 (55%) | 1823.2 | 18.9 | 4.45 | 99.7 | 0.96 | 1.39 | 1.27 |
+| 27.52 (65%) | 2155.1 | 22.4 | 6.21 | 99.7 | 1.13 | 1.59 | 1.50 |
+| 31.76 (75%) | 2492.3 | 26.5 | 8.29 | 99.8 | 1.31 | 1.83 | 1.73 |
+| 35.99 (85%) | 2830.4 | 29.9 | 10.67 | 99.8 | 1.48 | 2.11 | 1.96 |
+| 40.22 (95%) | 3172.1 | 32.9 | 13.36 | 99.8 | 1.65 | 2.39 | 2.19 |
+| 46.57 (110%) | 3695.6 | 38.7 | 18.02 | 99.9 | 1.91 | 2.80 | 2.54 |
 
 **E3 — fill level sweep**
 
 | J | T [N·m/m] | ±sd | P [kW/m] | yielded [%] | bed γ̇ [1/s] | free γ̇ [1/s] | max|u| [m/s] |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0.15 | 1880.3 | 36.2 | 6.25 | 100.0 | 1.90 | 2.94 | 1.72 |
-| 0.2 | 2095.7 | 30.7 | 6.97 | 100.0 | 1.62 | 2.35 | 1.72 |
-| 0.25 | 2288.2 | 4.8 | 7.61 | 99.9 | 1.43 | 2.06 | 1.72 |
-| 0.3 | 2466.2 | 27.4 | 8.20 | 99.7 | 1.30 | 1.95 | 1.72 |
-| 0.35 | 2630.9 | 32.8 | 8.75 | 99.5 | 1.20 | 1.83 | 1.72 |
-| 0.4 | 2787.4 | 26.5 | 9.27 | 99.4 | 1.12 | 1.78 | 1.72 |
-| 0.45 | 2938.5 | 8.4 | 9.77 | 99.0 | 1.05 | 1.82 | 1.72 |
+| 0.15 | 1905.1 | 36.9 | 6.34 | 100.0 | 1.91 | 2.88 | 1.73 |
+| 0.2 | 2121.3 | 31.8 | 7.05 | 99.9 | 1.63 | 2.27 | 1.73 |
+| 0.25 | 2314.3 | 5.4 | 7.70 | 99.9 | 1.44 | 1.96 | 1.73 |
+| 0.3 | 2492.3 | 26.5 | 8.29 | 99.8 | 1.31 | 1.83 | 1.73 |
+| 0.35 | 2656.5 | 32.7 | 8.83 | 99.5 | 1.20 | 1.69 | 1.73 |
+| 0.4 | 2811.1 | 27.6 | 9.35 | 99.0 | 1.12 | 1.61 | 1.73 |
+| 0.45 | 2960.5 | 10.4 | 9.84 | 99.1 | 1.05 | 1.62 | 1.73 |
 
 **E4 — media size sweep**
 
 | d_p [mm] | T [N·m/m] | ±sd | P [kW/m] | yielded [%] | bed γ̇ [1/s] | free γ̇ [1/s] | max|u| [m/s] |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0.5 | 3307.3 | 31.3 | 10.99 | 99.7 | 1.27 | 1.92 | 1.72 |
-| 1 | 2912.2 | 30.7 | 9.68 | 99.7 | 1.28 | 1.94 | 1.72 |
-| 2 | 2466.2 | 27.4 | 8.20 | 99.7 | 1.30 | 1.95 | 1.72 |
-| 5 | 1796.0 | 20.5 | 5.98 | 99.8 | 1.36 | 1.95 | 1.72 |
+| 0.5 | 3351.6 | 31.2 | 11.14 | 99.7 | 1.27 | 1.79 | 1.73 |
+| 1 | 2947.2 | 30.3 | 9.80 | 99.7 | 1.28 | 1.81 | 1.73 |
+| 2 | 2492.3 | 26.5 | 8.29 | 99.8 | 1.31 | 1.83 | 1.73 |
+| 5 | 1812.2 | 19.2 | 6.04 | 99.8 | 1.37 | 1.84 | 1.73 |
 
 **E5 — grid convergence** (identical Δt = 2e-3 s)
 
 | N | Δx [mm] | T [N·m/m] | P [kW/m] | yielded [%] | max|∇·u|Δx/U |
 | --- | --- | --- | --- | --- | --- |
-| 64 | 16.00 | 5036.8 | 16.75 | 99.6 | 1.1e-8 |
-| 128 | 8.00 | 2466.2 | 8.20 | 99.7 | 2.6e-8 |
-| 256 | 4.00 | 1269.2 | 4.22 | 99.9 | 5.1e-8 |
-| 512 | 2.00 | 665.9 | 2.21 | 99.9 | 6.1e-9 |
+| 64 | 16.00 | 5079.1 | 16.89 | 99.6 | 1.5e-8 |
+| 128 | 8.00 | 2492.3 | 8.29 | 99.8 | 2.6e-8 |
+| 256 | 4.00 | 1283.9 | 4.27 | 99.9 | 5.2e-8 |
+| 512 | 2.00 | 673.9 | 2.24 | 99.9 | 6.1e-9 |
 
-- torque change 64 → 128: **51.0 %**
+- torque change 64 → 128: **50.9 %**
 
 - torque change 128 → 256: **48.5 %**
 
@@ -248,26 +250,26 @@ Method, and it applies to every table below:
 
 | m [s] | T [N·m/m] | P [kW/m] | yielded [%] |
 | --- | --- | --- | --- |
-| 50 | 2460.4 | 8.18 | 77.57 |
-| 500 | 2459.6 | 8.18 | 97.29 |
-| 5000 | 2459.5 | 8.18 | 97.37 |
-| 50000 | 2459.5 | 8.18 | 97.37 |
+| 50 | 2487.1 | 8.27 | 80.50 |
+| 500 | 2486.1 | 8.27 | 97.07 |
+| 5000 | 2486.0 | 8.27 | 97.14 |
+| 50000 | 2486.0 | 8.27 | 97.14 |
 
 **E7b — viscosity clamp `mu_max`**
 
 | mu_max [Pa·s] | T [N·m/m] | P [kW/m] | yielded [%] |
 | --- | --- | --- | --- |
-| 100 | 2468.8 | 8.21 | 59.65 |
-| 1000 | 2459.6 | 8.18 | 97.33 |
-| 10000 | 2458.3 | 8.17 | 99.55 |
+| 100 | 2496.0 | 8.30 | 59.83 |
+| 1000 | 2486.0 | 8.27 | 97.04 |
+| 10000 | 2484.1 | 8.26 | 99.42 |
 
 **E7c — viscous iterations `n_visc`**
 
 | n_visc | T [N·m/m] | P [kW/m] | yielded [%] |
 | --- | --- | --- | --- |
-| 8 | 2451.8 | 8.15 | 97.69 |
-| 24 | 2469.5 | 8.21 | 96.96 |
-| 64 | 2475.5 | 8.23 | 96.33 |
+| 8 | 2476.5 | 8.24 | 97.53 |
+| 24 | 2497.5 | 8.31 | 96.38 |
+| 64 | 2503.7 | 8.33 | 95.58 |
 
 _52 runs; 0 flagged as not settled._
 
@@ -278,8 +280,8 @@ doubling of `N`:
 
 | `N` | 64 | 128 | 256 | 512 |
 | --- | --- | --- | --- | --- |
-| `T` [N·m/m] | 5036.8 | 2466.2 | 1269.2 | 665.9 |
-| change vs. previous | — | −51.0 % | −48.5 % | −47.5 % |
+| `T` [N·m/m] | 5079.1 | 2492.3 | 1283.9 | 673.9 |
+| change vs. previous | — | −50.9 % | −48.5 % | −47.5 % |
 
 `T ∝ 1/N` to within a couple of percent over an 8× refinement range. The
 `EXPERIMENT_PLAN.md` acceptance criterion — "torque differs by < 5 % between 256
@@ -300,7 +302,10 @@ each other and the grid arbitrates between them.
   never be compared against a measured mill power.
 - Every sweep in §3.1 was run at `N = 128` and is therefore internally consistent,
   so **the trends are usable** — E2's monotonic rise with speed, E4's fall with
-  media size, E1's factor-2.2 rise with flow index. The levels are not.
+  media size, E1's factor-2.3 rise with flow index. The levels are not.
+- §6.4 adds the time axis: `T` does not converge in `Δt` either, rising from
+  1528 to 6362 N·m/m as `Δt` goes 4e-3 → 2.5e-4 s at fixed `N = 128`. The torque
+  is a function of `(Δx, Δt, η)`, not of the flow alone.
 - This invalidates the previous report's E5 claim of "torque differs by < 6.3 %
   between N=64 and N=128". The measured figure is 51 %.
 
@@ -310,21 +315,21 @@ change to assumption A4, which is a specification decision, not a patch.
 
 ### 3.3 E1 — rheology
 
-Power rises monotonically with flow index: 6.23 kW/m at `n = 0.4` to 14.02 kW/m
-at `n = 1.2`, a factor of 2.25 at `τ_y = 0`. Shear-thinning substantially reduces
+Power rises monotonically with flow index: 6.31 kW/m at `n = 0.4` to 14.23 kW/m
+at `n = 1.2`, a factor of 2.26 at `τ_y = 0`. Shear-thinning substantially reduces
 the power the shell must supply, because the mill's high shear rates drive
 `μ_app` down. The previous report claimed a change from 515.6 to 464.1 kW/m over
 the same axis — a 10 % effect, at a power level ~60× too high.
 
 Yield stress has a **much weaker and sign-dependent** effect: at `n = 0.4` raising
-`τ_y` from 0 to 50 Pa *increases* power by 9 %, while at `n = 1.2` it *decreases*
-it by 6.7 %. The yielded area fraction falls from 100 % to ~92 % over the same
+`τ_y` from 0 to 50 Pa *increases* power by 8.9 %, while at `n = 1.2` it
+*decreases* it by 6.5 %. The yielded area fraction falls from 100 % to ~92 % over the same
 range and is almost independent of `n`.
 
 ### 3.4 E2, E3 — speed and fill, and an honest limit
 
-Power rises monotonically with speed (2.32 kW/m at 40 %`N_c` to 17.89 at 110 %)
-and with fill (6.25 kW/m at `J = 0.15` to 9.77 at `J = 0.45`). Both are
+Power rises monotonically with speed (2.37 kW/m at 40 %`N_c` to 18.02 at 110 %)
+and with fill (6.34 kW/m at `J = 0.15` to 9.84 at `J = 0.45`). Both are
 monotonic over the whole range sampled.
 
 **Real mills are not monotonic in either variable** — power peaks near 80–85 %
@@ -337,28 +342,28 @@ and it must not be plotted against Hogg–Fuerstenau or Morrell as though it wer
 
 ### 3.5 E4 — media size
 
-Power falls from 10.99 kW/m at `d_p = 0.5 mm` to 5.98 kW/m at `d_p = 5 mm`, a
+Power falls from 11.14 kW/m at `d_p = 0.5 mm` to 6.04 kW/m at `d_p = 5 mm`, a
 factor 1.84 across a 100× permeability range (`K_perm ∝ d_p²`). Finer media pack
 to a lower permeability, so the slurry is dragged harder by the charge. Bed mean
-shear rate is nearly flat (1.27 → 1.36 s⁻¹), i.e. the effect is on the drag
+shear rate is nearly flat (1.27 → 1.37 s⁻¹), i.e. the effect is on the drag
 coupling, not on the resolved shear field.
 
 ### 3.6 E7 — numerical sensitivity, including one non-converged quantity
 
-- **E7a (Papanastasiou `m`)**: torque is insensitive (2460.4 → 2459.5 N·m/m over
+- **E7a (Papanastasiou `m`)**: torque is insensitive (2487.1 → 2486.0 N·m/m over
   `m = 50 → 50000`, 0.04 %). Yielded fraction is converged above `m ≈ 500`
-  (77.57 % at `m = 50`, then 97.29 / 97.37 / 97.37 %). The acceptance criterion
+  (80.50 % at `m = 50`, then 97.07 / 97.14 / 97.14 %). The acceptance criterion
   — under 2 % change between `m = 5000` and `m = 50000` — is met at 0.00 %.
-- **E7b (`μ_max` clamp)**: torque insensitive (0.4 % over two decades). But the
+- **E7b (`μ_max` clamp)**: torque insensitive (0.5 % over two decades). But the
   **yielded fraction is not converged with respect to this purely numerical
-  parameter**: 59.65 % at `μ_max = 1e2`, 97.33 % at 1e3, 99.55 % at 1e4. The
+  parameter**: 59.83 % at `μ_max = 1e2`, 97.04 % at 1e3, 99.42 % at 1e4. The
   clamp is active on enough of the domain to move the answer by 40 points.
   Yielded fraction must therefore be quoted with its `μ_max`, and the default
   `1e3 Pa·s` is not a converged choice. This contradicts the previous report's
   E7 conclusion of "< 0.001 % change in yielded fraction", which was measured
   with the broken diagnostic that returned 1.000 regardless.
-- **E7c (`n_visc`)**: torque varies 1.0 % and yielded fraction 1.4 % over 8 → 64
-  sweeps, confirming the macro solver sits well inside the viscous solver's
+- **E7c (`n_visc`)**: torque varies 1.1 % and yielded fraction 2.0 points over
+  8 → 64 sweeps, confirming the macro solver sits well inside the viscous solver's
   validity range (`D ≈ 1e-2`, see `KERNEL_REFERENCE.md` §12).
 
 All 52 runs settled: no run drifted more than 5 % across its averaging window.
@@ -630,3 +635,198 @@ Outstanding work, in order:
 1. Explain the `ρ` dependence; scale `η` with `ν` and re-test.
 2. Re-verify against Gebart near `φ_max`, where the benchmark is valid (§5.0).
 3. Only then re-run E6 and calibrate `A_2D`.
+
+---
+
+## 6. Review Findings, round 3 — gravity, and two non-convergences
+
+Triggered 2026-08-16 by a user question about the default field view rendering as
+one flat colour. The rendering answer is §6.5; getting there involved sweeping 49
+mill configurations through the real UI, which surfaced a solver defect (§6.1)
+and, once that was fixed, two things that do not converge (§6.3, §6.4).
+
+Sweep integrity: 49 configurations (all 10 presets, plus sweeps in rpm, `K`, `n`,
+`τ_y`, `J`, `D`, lifters, `N`, `ε`, `d_p`, `k_slip`, `CFL` and advection scheme),
+each run 250 steps through `window.__MILL_APP__` in headless Chromium.
+**0 NaN, 0 console errors, no divergence**; `max|∇·u| <= 8.8e-5` throughout.
+Every monotonic trend came out with the expected sign: `T` rises with rpm
+(0 → 42087 N·m/m over 0 → 300 rpm), with `K` (1402 → 8481 over 1e-4 → 100 Pa·s),
+with `n` (1426 → 7207 over 0.2 → 2.0) and with `J` (93 → 3250 over 0 → 0.60);
+it falls with `d_p` (3276 → 1775 over 0.5 → 5 mm), with `ε` (2944 → 148 over
+0.26 → 0.95) and with `k_slip` (16698 → 49 over 0 → 1); and reversing the
+rotation returns `T` negated to the last digit. `χ_bed` coincides with the drawn
+chord overlay, and the free surface tilts the correct way for CCW rotation.
+
+### 6.1 Gravity was applied 1/ρ too weak (severity: high) — FIXED
+
+`Solver.subStep` summed two quantities with different units before dividing by
+`ρ`:
+
+```ts
+const fx = this.bodyFx + this.gx;      // N/m^3  +  m/s^2
+u[k] += dt * fx * (1.0/this.rho) * (1.0 - chiFace);
+```
+
+`bodyF` is a **force density**: the Poiseuille exact solution
+`u = f/(2μ)·y(L−y)` (`tests/phase2_rheology.test.ts:23`) and the Darcy reduction
+`K = μU/f` (`assembly/rve.ts:318`) both fix that convention, so `/ρ` is correct
+for it. Gravity is an **acceleration** — `NUMERICS.md` step 4 writes
+`u* ← u* + Δt·g` and `KERNEL_REFERENCE.md` §10 writes
+`u[k] += dt * gx * (1.0 - chiFaceU[k])`, neither with a `1/ρ`. Lumping the two
+together divided gravity by the slurry density: at the default `ρ = 1800` the
+mill ran on `9.81/1800 = 5.4e-3 m/s²`.
+
+Evidence before the fix, default preset at `t = 1.0 s`:
+
+| `g` [m/s²] | 0 | 9.81 | 30 |
+| --- | --- | --- | --- |
+| `T` [N·m/m] | 2366.292 | 2366.309 | 2366.343 |
+
+— gravity was inert to five significant figures, and the pressure field carried
+no hydrostatic gradient at all (centre-column top-to-bottom difference −1497 Pa,
+sign inverted, against `ρgD = 17658 Pa`).
+
+Fixed by dividing only the force density: `a = bodyF/ρ + g`. Nothing in the suite
+had ever exercised gravity — every other test calls `setGravity(0, 0)` — so
+`tests/phase9_gravity.test.ts` (**V11**) was added:
+
+| Case | Measured | Exact | Tolerance | Result |
+| --- | --- | --- | --- | --- |
+| V11a closed box `dp/dy`, `ρ = 1800` | −17657.9 Pa/m | −17658.0 Pa/m | 2 % | **0.001 %** |
+| V11b `dp/dy` ratio, `ρ` 1000 → 2000 | 2.0000 | 2 | ±2 % | **PASS** |
+| V11c mill pressure span at `g = 9.81` | 12956 Pa | `ρg·2R` = 14126 Pa | order of magnitude | **PASS** |
+
+V11b is the assertion that pins the convention: under the old behaviour the
+recovered gradient was `ρ·(g/ρ) = g`, i.e. **independent of density**, so the
+ratio was 1.
+
+Effect on the mill, measured with the fix in place and Δt matched at 2e-3 s:
+
+| `g` [m/s²] | 0 | 1 | 9.81 | 30 |
+| --- | --- | --- | --- | --- |
+| `T` [N·m/m] | 2360.0 | 2363.1 | 2390.6 | 2454.4 |
+| ΔT vs `g = 0` | — | +0.1 % | **+1.3 %** | +4.0 % |
+| pressure span [Pa] | 6146 | 5920 | 15772 | 47176 |
+
+This is the right shape. In a flooded constant-density single-phase mill gravity
+is a pure gradient and *should* be dynamically inert, showing up only as
+hydrostatic pressure — which is now what happens: the pressure span goes from
+purely dynamic (6.1 kPa) to hydrostatic-dominated (15.8 kPa ≈ `ρgD`), while the
+torque moves 1.3 %. The residual 1.3 % is the `(1 − χ)` masking required by
+`KERNEL_REFERENCE.md` §10, which makes the body force discontinuous at the
+immersed shell and therefore not quite a pure gradient. It is left in place: §10
+mandates the mask for an independent and also real reason.
+
+**Correction to an interim number.** A first estimate of this effect, made by
+injecting `setGravity(0, −ρg)` into the *unfixed* build, reported +82 %. That was
+an artefact of the injection: `|g| = 17658` tripped the gravity time-step limit
+`Δt <= sqrt(Δx/|g|)`, so that run used Δt = 6.7e-4 s against 2e-3 s for its
+baseline, and the difference was Δt, not gravity (see §6.4). The correct figure
+is **+1.3 %**.
+
+### 6.2 Body force written to faces the projection cannot correct (severity: low) — FIXED
+
+`applyGradient` (`grid.ts:198–226`) updates `u` only for `i ∈ [1, N−1]` and `v`
+only for `j ∈ [1, N−1]` unless that direction is periodic, while
+`calcDivergence` *reads* the domain-boundary faces. The body-force loop wrote
+all of them, injecting a wall-normal velocity no projection could remove. Now
+restricted to the faces `applyGradient` covers — no-penetration means gravity
+cannot accelerate fluid through a wall.
+
+Measurably this changed nothing: the mill's box boundary is fictitious solid so
+`(1 − χ_face)` was already 0 there, and the cavity result was bit-identical.
+Kept because the invariant — never force a face the projection cannot fix — is
+the correct one and the next body-force mode would have hit it.
+
+### 6.3 A quiescent box under gravity does not stay quiescent (severity: medium) — OPEN
+
+V11a recovers the hydrostatic gradient to 0.001 % but the fluid is not at rest.
+A creeping circulation appears along the side walls:
+
+| | N = 16 | N = 32 | N = 64 |
+| --- | --- | --- | --- |
+| `max\|u\|` at `t = 4 s` [m/s] | 2.28e-3 | 7.40e-3 | 1.37e-2 |
+
+and it grows with time at fixed `N = 32`: 7.40e-3 (`t = 4 s`), 1.24e-2 (12 s),
+1.44e-2 (24 s), 1.58e-2 (48 s) m/s. It is bounded by one step's un-projected
+gravity, `g·Δt = 1.96e-2 m/s`, which the tolerance in V11a asserts.
+
+Mechanism, from a parameter scan: it is exactly linear in `g` at fixed `ρ`
+(`max|u|/ρg` constant to four digits across `g` = 0.1, 1, 9.81) but **not**
+proportional to `ρg` across `ρ` — it *falls* as `ρ` rises — and it grows with
+`ν = μ/ρ`, saturating near `g·Δt`. It is independent of `n_visc`, so it is not
+the Jacobi diffusion solve. The boundary-face hypothesis was tested and
+eliminated (§6.2, bit-identical). **Not diagnosed.**
+
+Impact on the mill is bounded: 2e-2 m/s against a tip speed of 1.57 m/s is ~1 %,
+and inside the mill the penalization damps it. But it is a spurious mode that
+does not vanish under refinement and it should be understood before the pressure
+field is used quantitatively.
+
+### 6.4 The shell torque does not converge in Δt either (severity: high) — OPEN
+
+§3.2 records that `T ∝ 1/N` in space. It does not converge in **time** either.
+Default preset, `g = 9.81`, `N = 128`, each run carried to `t = 1.0 s`:
+
+| Δt [s] | 4.0e-3 | 2.0e-3 | 1.0e-3 | 5.0e-4 | 2.5e-4 |
+| --- | --- | --- | --- | --- | --- |
+| `T` [N·m/m] | 1528.0 | 2390.6 | 3535.7 | 4890.2 | 6362.2 |
+| `KE` [J/m] | 1393.2 | 1366.2 | 1335.4 | 1297.6 | 1258.8 |
+| `max\|u\|` [m/s] | 1.629 | 1.629 | 1.645 | 1.682 | 1.746 |
+
+`T` rises by ~1.3× per halving of Δt and shows no sign of settling, while the
+velocity field it is supposedly measuring moves by 7 % over the same 16× range.
+The cause is the same structural one as §3.2: `computeShellTorque` reads the
+implicit penalization residual `(u − u_wall)·χ/η`, whose magnitude is set by
+`1/(1 + Δt/η)`. With `η = 1e-4` held fixed, shrinking Δt shrinks `Δt/η` and
+inflates the residual the torque is computed from. The torque is a function of
+`(Δx, Δt, η)`, not of the flow alone.
+
+**This strengthens, and does not change, the §3.2 conclusion:** absolute torque
+and power from this model are numerical artefacts. Every table in §3.1 was
+generated at one fixed `(N, Δt, η)` and its *trends* remain usable; the levels
+are not, and the UI must say so (§6.5).
+
+A proper fix is the same one §3.2 names — the charge must exert drag through a
+resolved force distribution rather than a kinematic constraint touching the wall
+(assumption A4) — plus tying `η` to Δt so the penalization residual is a fixed
+fraction. Both are specification decisions, not patches.
+
+### 6.5 Field rendering: four defects (severity: medium) — SPECIFIED, NOT FIXED
+
+These are UI, i.e. Gemini's to implement; specified as `IMPLEMENTATION_PLAN.md`
+Phase 9. Summary:
+
+1. **Degenerate colour range is faked as `[0, 1]`.** Any uniform field trips it.
+   The default preset is Newtonian, so `μ_app ≡ 0.1 Pa·s`, and the mill renders
+   as flat viridis green — `rgb(94, 201, 98)`, which is 0.75 of the ramp under
+   the fabricated span, sampled and confirmed on the canvas. The bar reads
+   `0.000 / 0.500 / 1.00`; the data is 0.1 everywhere. **The physics is correct
+   and the picture is not.**
+2. **Log bars carry linear tick labels.** The midpoint label is the arithmetic
+   mean of the endpoints while the colours are log-spaced: for `γ̇` the bar spans
+   0.0536–37.40, the label says 18.73, the colour means 1.42 — 13× out.
+3. **The default field is one the default preset makes constant**
+   (`index.html:25`). Should be `speed`.
+4. **`vorticity` is forced onto a symmetric diverging map** although `ω_z` is
+   single-signed in a mill turning one way, so half the ramp is unused.
+
+Also unaddressed: `ui/panel.ts:273–274` shows `Shell Torque (T)` and
+`Power Draw (P)` with no indication that §3.2 and §6.4 make them mesh- and
+time-step-dependent. A caveat belongs next to those two readouts.
+
+### 6.6 The smoke test runs at Δt = 0.1 s and prints its torque anyway (severity: low)
+
+`scripts/smoke.mjs:97` drives the solver with `w.step(0.1)`. That argument is
+passed straight through (`index.ts:144`), overriding the adaptive time step, so
+the only end-to-end check in the repository runs at **50× the schema maximum**
+(`maxDt = 0.01`) and roughly 12× the CFL limit for the default preset
+(`CFL·Δx/|u| ≈ 8e-3 s`).
+
+The test still does its job — it proves the bundle loads, the WASM instantiates,
+no console errors appear and every diagnostic is finite — and none of those
+assertions depend on Δt. But it *prints* `Torque: 155.5 N*m/m` next to them,
+against ~2400 N·m/m for the same preset at Δt = 2e-3 s. Given §6.4 that gap is
+expected, not a failure; the problem is that a reader has no way to tell. Either
+drop the torque and power lines from the smoke output, or label them
+"Δt = 0.1 s, not a physical result". Left for Gemini with the Phase 9 UI work.

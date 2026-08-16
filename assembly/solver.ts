@@ -306,26 +306,52 @@ export class Solver {
     for (let k = 0; k < N * (N + 1); k++) this.v[k] = this.vStar[k];
 
     // 3. Body forces & Gravity (scaled by (1 - chiFace)) (KERNEL_REFERENCE.md §10)
-    const fx = this.bodyFx + this.gx;
-    const fy = this.bodyFy + this.gy;
-    if (fx != 0.0 || fy != 0.0) {
-      const invRho = 1.0 / this.rho;
+    // bodyF is a force density [N/m^3] — the driving term of the Poiseuille and
+    // Darcy verification cases, whose exact solutions (u = f/(2 mu) y (L-y),
+    // K = mu U / f) fix that convention — so it enters the momentum equation
+    // divided by rho. Gravity is an *acceleration* [m/s^2] (NUMERICS.md step 4,
+    // KERNEL_REFERENCE.md §10) and must not be. Summing the two before dividing
+    // scaled gravity down by rho: at the default rho = 1800 the mill ran on
+    // 9.81/1800 = 5.4e-3 m/s^2, so the pressure field carried no hydrostatic
+    // gradient at all and g was inert to five significant figures.
+    const ax = this.bodyFx / this.rho + this.gx;
+    const ay = this.bodyFy / this.rho + this.gy;
+    if (ax != 0.0 || ay != 0.0) {
+      // Only force the faces the projection is able to correct. applyGradient
+      // (grid.ts) updates u for i in [1, N-1] and v for j in [1, N-1] unless the
+      // corresponding direction is periodic, while calcDivergence *reads* the
+      // domain-boundary faces. Forcing a face the gradient step never touches
+      // injects a wall-normal velocity that no projection can remove: with
+      // gravity at its correct magnitude the closed cavity leaked through the
+      // floor and ceiling every step and grew a creeping circulation along the
+      // side walls (1.4e-2 m/s at N=64 after 2000 steps, worsening with both t
+      // and N). No-penetration means gravity cannot accelerate fluid through a
+      // wall, so skipping those faces is the physics, not a patch.
+      // For the mill this changes nothing: the box boundary is fictitious solid,
+      // so (1 - chiFace) is already 0 there.
+      const xPeriodic = (this.boundaryMode == MODE_PERIODIC || this.boundaryMode == MODE_CHANNEL);
+      const yPeriodic = (this.boundaryMode == MODE_PERIODIC);
+      const i0 = xPeriodic ? 0 : 1;
+      const i1 = xPeriodic ? N : N - 1;
+      const j0 = yPeriodic ? 0 : 1;
+      const j1 = yPeriodic ? N : N - 1;
+
       for (let j = 0; j < N; j++) {
-        for (let i = 0; i <= N; i++) {
+        for (let i = i0; i <= i1; i++) {
           const k = idxU(N, i, j);
           const cL = i > 0 ? idxC(N, i - 1, j) : idxC(N, 0, j);
           const cR = i < N ? idxC(N, i,     j) : idxC(N, N - 1, j);
           const chiFace = 0.5 * (this.chi[cL] + this.chi[cR]);
-          this.u[k] += dt * fx * invRho * (1.0 - chiFace);
+          this.u[k] += dt * ax * (1.0 - chiFace);
         }
       }
-      for (let j = 0; j <= N; j++) {
+      for (let j = j0; j <= j1; j++) {
         for (let i = 0; i < N; i++) {
           const k = idxV(N, i, j);
           const cB = j > 0 ? idxC(N, i, j - 1) : idxC(N, i, 0);
           const cT = j < N ? idxC(N, i, j    ) : idxC(N, i, N - 1);
           const chiFace = 0.5 * (this.chi[cB] + this.chi[cT]);
-          this.v[k] += dt * fy * invRho * (1.0 - chiFace);
+          this.v[k] += dt * ay * (1.0 - chiFace);
         }
       }
     }

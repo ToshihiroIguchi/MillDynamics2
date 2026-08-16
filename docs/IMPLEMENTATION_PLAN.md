@@ -515,6 +515,73 @@ the 3D Ergun placeholders.
 
 ---
 
+## Phase 9 — Field rendering: colour limits, log ticks, defaults
+
+Written 2026-08-16 after a UI audit (`VALIDATION.md` §6.5). The solver is not
+involved in any item here; all four are in `src/render/field.ts`, plus one line
+of `index.html`. Each item states the observed symptom, because the symptom is
+the acceptance test.
+
+### 9.1 Degenerate colour range must not be faked
+
+`field.ts::render` falls back to `minVal = 0, maxVal = 1` whenever
+`percentileRange` returns `min >= max` — which is the *normal* case for any
+uniform field, not an error. With the default preset (Newtonian, `n = 1`,
+`τ_y = 0`) `μ_app ≡ K = 0.1 Pa·s` in every fluid cell, so the fallback fires,
+the log mapping then places 0.1 at `(log10 0.1 − log10 1e-4)/4 = 0.75` of the
+ramp, and the mill renders as one flat viridis green — `rgb(94, 201, 98)`,
+verified by sampling the canvas. The bar is labelled `0.000 / 0.500 / 1.00`,
+none of which is anywhere in the data.
+
+Required: when the field is constant to within a small relative tolerance,
+render it at the **middle** of the ramp and label the bar with the single actual
+value (e.g. `μ_app = 0.100 Pa·s (uniform)`). Never invent a `[0, 1]` span.
+
+### 9.2 Log-scaled bars need log-spaced tick labels
+
+`drawColorbar` prints `fmt(0.5*(lo+hi))` at the bar's midpoint while the colours
+are assigned in `log10`. Measured on the default preset:
+
+| field | bar `lo` | bar `hi` | label printed at mid | value the mid colour means | error |
+| --- | --- | --- | --- | --- | --- |
+| `γ̇` | 0.0536 | 37.40 | 18.73 | 1.42 | 13× |
+| `μ_app` (HB, `τ_y = 5`) | 0.315 | 97.97 | 49.14 | 5.55 | 8.8× |
+
+Required: in log mode place ticks at decade boundaries inside `[lo, hi]`, or at
+minimum print the geometric mean. Also stop printing `0.000` as the lower bound
+of a log axis — the actual floor is the `1e-4` clamp, and the two floors in
+`render` (`1e-4` for `logMin`, `1e-3` for `logMax`) should be one constant.
+
+### 9.3 Default field must not be one the default preset makes constant
+
+`index.html` marks `<option value="mu" selected>`. Preset 0 is Newtonian, so
+`μ_app` is constant by construction and the app opens on a blank screen. The
+same is true of `yieldState` at `τ_y = 0` (all yielded, all one colour).
+
+Required: default to `speed`. `|u|` is never uniform in a rotating mill, and it
+is the field that makes the boundary layer, the vortex core and the bed visible
+at a glance.
+
+### 9.4 One-signed fields on a diverging map waste half the ramp
+
+`vorticity` is forced to `coolwarm` on a symmetric `±max|ω|` range. In a mill
+turning one way `ω_z` is single-signed almost everywhere, so the rendered field
+occupies one half of the map and reads as a single pink wash. Required: keep the
+diverging map centred on zero only when the field actually changes sign;
+otherwise fall back to the sequential map over the true range.
+
+**DoD**
+- [ ] Default preset opens on `|u|` with a bar whose end labels match
+      `diagMaxVel()` to the displayed precision.
+- [ ] Selecting `μ_app` on the default preset shows a uniform field labelled with
+      `0.100 Pa·s`, not a `[0, 1]` ramp.
+- [ ] On a Herschel–Bulkley preset, the value read off the `μ_app` bar at the
+      midpoint colour agrees with the sampled cell value to within the tick
+      spacing.
+- [ ] No field view prints a tick label that is not attainable by the data.
+
+---
+
 ## 動作確認 — the operational check-list
 
 Run this whole sequence before reporting completion. It is the definition of
